@@ -12,9 +12,11 @@ if not uploaded_file:
 
 # === Product infomation ===
 
+models = pd.read_excel(uploaded_file, sheet_name="Models")
+
 product_to_category = dict(zip(models["Product code"], models["Category code"]))
 product_to_name = dict(zip(models["Product code"], models["Product name"]))
-product_to_price = dict(zip(models["Product code"], models["Product Price"]))
+product_to_price = dict(zip(models["Product code"], models["Product price"]))
 
 ALL_PRODUCTS = list(product_to_category.keys())
 
