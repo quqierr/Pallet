@@ -4,22 +4,21 @@ from collections import Counter
 
 st.title("Pallet Assistant (Category-based)")
 
-# Excel Sheet
+# === Excel Sheet ===
 uploaded_file = st.file_uploader("Bitte Excel-Datei hochladen", type=["xlsx"])
 
 if not uploaded_file:
     st.stop()
 
-# Product code | Category code
-models = pd.read_excel(uploaded_file, sheet_name="Models")
-product_to_category = dict(
-    zip(models["Product code"], models["Category code"])
-)
+# === Product infomation ===
+
+product_to_category = dict(zip(models["Product code"], models["Category code"]))
+product_to_name = dict(zip(models["Product code"], models["Product name"]))
+product_to_price = dict(zip(models["Product code"], models["Product Price"]))
 
 ALL_PRODUCTS = list(product_to_category.keys())
-ALL_CATEGORIES = set(product_to_category.values())
 
-# Rules
+# === Rule ===
 PALLET_RULES = [
     {"K1": 1},
     {"K2": 2},
@@ -51,6 +50,7 @@ PALLET_RULES = [
 ]
 
 
+# === Rule check function ===
 def can_add_category(current_cat_count, new_cat):
     test = current_cat_count.copy()
     test[new_cat] = test.get(new_cat, 0) + 1
@@ -66,16 +66,27 @@ def can_add_category(current_cat_count, new_cat):
     return False
 
 
-# Input
-st.subheader("Product in the Pallet")
+# === User input ===
+st.subheader("Products already in the Pallet")
 
 selected_products = st.multiselect(
-    "Product in the Pallet：",
-    ALL_PRODUCTS
+    "Select Product code (repeat allowed):",
+    ALL_PRODUCTS,
+    format_func=lambda x: f"{x} – {product_to_name[x]}"
 )
 
+# === Current pallet status ===
+current_categories = Counter(
+    product_to_category[p] for p in selected_products
+)
 
-# === 推荐还能放什么 Product ===
+st.write("Current Category count:", dict(current_categories))
+
+# === Total pallet price ===
+total_price = sum(product_to_price[p] for p in selected_products)
+st.write(f"💰 Total Pallet Price: € {total_price:.2f}")
+
+# === Recommend what can still be added ===
 allowed_products = []
 
 for p in ALL_PRODUCTS:
@@ -83,8 +94,12 @@ for p in ALL_PRODUCTS:
     if can_add_category(current_categories, cat):
         allowed_products.append(p)
 
-st.subheader("Product to put：")
+st.subheader("Products that can still be added:")
+
 if allowed_products:
-    st.write(allowed_products)
+    st.write([
+        f"{p} – {product_to_name[p]} (€{product_to_price[p]:.2f})"
+        for p in allowed_products
+    ])
 else:
-    st.write("Pallet is full")
+    st.write("❌ Pallet is full")
