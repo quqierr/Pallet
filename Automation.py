@@ -4,25 +4,22 @@ from collections import Counter
 
 st.title("Pallet Assistant (Category-based)")
 
-# === 上传 Excel ===
-uploaded_file = st.file_uploader("上传 Excel 文件", type=["xlsx"])
+# Excel Sheet
+uploaded_file = st.file_uploader("Bitte Excel-Datei hochladen", type=["xlsx"])
 
 if not uploaded_file:
     st.stop()
 
-# === 读取 Models 表 ===
+# Product code | Category code
 models = pd.read_excel(uploaded_file, sheet_name="Models")
-
-# 必须有这两列
-# Product code | Category
 product_to_category = dict(
-    zip(models["Product code"], models["Category"])
+    zip(models["Product code"], models["Category code"])
 )
 
 ALL_PRODUCTS = list(product_to_category.keys())
 ALL_CATEGORIES = set(product_to_category.values())
 
-# === Pallet 规则（Category 级） ===
+# Rules
 PALLET_RULES = [
     {"K1": 1},
     {"K2": 2},
@@ -53,7 +50,7 @@ PALLET_RULES = [
     {"A": 2, "K8": 2},
 ]
 
-# === 判断函数 ===
+
 def can_add_category(current_cat_count, new_cat):
     test = current_cat_count.copy()
     test[new_cat] = test.get(new_cat, 0) + 1
@@ -69,8 +66,8 @@ def can_add_category(current_cat_count, new_cat):
     return False
 
 
-# === 用户输入 ===
-st.subheader("当前 pallet 已放入的 Product code")
+# Input
+st.subheader("Product in the Pallet")
 
 selected_products = st.multiselect(
     "可重复选择 Product code：",
