@@ -1,66 +1,75 @@
-import pandas as pd
 import streamlit as st
+from collections import Counter
 
-st.title("Pallet Combination Assistant")
+st.title("Pallet Rule Assistant")
 
-# 上传 Excel
-uploaded_file = st.file_uploader("上传 Excel 文件", type=["xlsx"])
+# === 所有 pallet 规则 ===
+PALLET_RULES = [
+    {"K1": 1},
+    {"K2": 2},
+    {"KB": 2},
+    {"B": 6},
+    {"K6": 24},
+    {"K8": 6},
+    {"S": 4},
+    {"A": 4},
+    {"8888": 2},
 
-if uploaded_file:
-    models = pd.read_excel(uploaded_file, sheet_name="Models")
-    combination = pd.read_excel(uploaded_file, sheet_name="Combination")
+    {"A": 3, "S": 1},
+    {"A": 2, "S": 2},
+    {"A": 1, "S": 3},
 
-    # 生成规则表
-    rules = []
-    for col in combination.columns:
-        products = combination[col].dropna().tolist()
-        for a in products:
-            for b in products:
-                if a != b:
-                    rules.append((a, b))
-    rules_df = pd.DataFrame(rules, columns=["Product_A", "Product_B"])
+    {"A": 2, "B": 2, "K6": 2},
+    {"A": 1, "S": 1, "B": 2, "K6": 2},
+    {"S": 2, "B": 2, "K6": 2},
 
-    # 选择已放产品
-    selected_products = st.multiselect(
-        "已放入 pallet 的产品：",
-        models["Product code"].tolist()
-    )
+    {"A": 3, "B": 1},
+    {"A": 2, "S": 1, "B": 1},
+    {"A": 1, "S": 2, "B": 1},
+    {"S": 3, "B": 1},
 
-    # 计算剩余空间
-    used = 0
-    for p in selected_products:
-        cap = models.loc[models["Product code"] == p, "Numbers on one pallet"].values[0]
-        used += 1 / cap
+    {"KB": 1, "B": 1, "A": 1, "K6": 1},
+    {"KB": 1, "B": 1, "S": 1, "K6": 1},
 
-    remaining = max(0, 1 - used)
-    st.write(f"剩余 pallet 空间：{round(remaining, 2)}")
+    {"A": 2, "K8": 2},
+]
 
-    # 推荐逻辑
-    def get_allowed_products(selected_products, remaining_space):
-        allowed = []
+ALL_PRODUCTS = sorted({p for rule in PALLET_RULES for p in rule.keys()})
 
-        for _, row in models.iterrows():
-            product = row["Product code"]
-            capacity = row["Numbers on one pallet"]
-            needed_space = 1 / capacity
 
-            if needed_space > remaining_space:
-                continue
+def can_add(current, product, rules):
+    test = current.copy()
+    test[product] = test.get(product, 0) + 1
 
-            ok = True
-            for sel in selected_products:
-                if not (
-                    ((rules_df["Product_A"] == sel) & (rules_df["Product_B"] == product)).any()
-                ):
-                    ok = False
-                    break
+    for rule in rules:
+        ok = True
+        for p, qty in test.items():
+            if rule.get(p, 0) < qty:
+                ok = False
+                break
+        if ok:
+            return True
+    return False
 
-            if ok:
-                allowed.append(product)
 
-        return allowed
+def allowed_products(current, products, rules):
+    return [p for p in products if can_add(current, p, rules)]
 
-    if selected_products:
-        allowed = get_allowed_products(selected_products, remaining)
-        st.subheader("还能放的产品：")
-        st.write(allowed)
+
+# === 当前 pallet 状态 ===
+st.subheader("当前 pallet 内容")
+
+selected = st.multiselect(
+    "已放入的产品（可重复选）：",
+    ALL_PRODUCTS
+)
+
+current = dict(Counter(selected))
+
+st.write("当前数量：", current)
+
+# === 推荐 ===
+allowed = allowed_products(current, ALL_PRODUCTS, PALLET_RULES)
+
+st.subheader("还可以继续放的产品：")
+st.write(allowed if allowed else "❌ 没有任何产品可以再放")
