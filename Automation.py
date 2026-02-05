@@ -19,6 +19,7 @@ def load_data(file):
     p_to_cat = dict(zip(models["Product code"], models["Category code"]))
     p_to_name = dict(zip(models["Product code"], models["Product name"]))
     p_to_price = dict(zip(models["Product code"], models["Product price"]))
+    p_to_cat_fullname = dict(zip(models["Product code"], models["Sub-Categories"]))
     all_prods = list(p_to_cat.keys())
     return p_to_cat, p_to_name, p_to_price, all_prods
 
@@ -34,6 +35,8 @@ PALLET_RULES = [
     {"K8": 6},
     {"S": 4}, 
     {"A": 4},
+    {"T4": 4},
+    {"T2": 2},
     {"8888": 2},
     {"A": 3, "S": 1},
     {"A": 2, "S": 2},
@@ -150,12 +153,21 @@ else: # is_current_valid and can_add_more
     st.info("✅ Pallet can still load")
     
 
-    with st.expander("Show available additions details"):
-        available_cats = set(product_to_category[p] for p in allowed_additions)
-        st.write(f"Available Categories to add: {', '.join(available_cats)}")
+  with st.expander("Show available additions details"):
         
-        st.write("Specific products (Sample):")
-        for p in allowed_additions[:30]:
-            st.write(f"- {p} ({product_to_name[p]})")
-        if len(allowed_additions) > 10:
-            st.write(f"... and {len(allowed_additions)-10} more.")
+
+        available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
+        
+        st.write(f"**Available Categories to add:**")
+        st.write(", ".join(available_names))
+        
+        st.write("---")
+        st.write("**Specific products:**")
+        
+        for p in allowed_additions[:10]:
+            # 获取全称用于显示
+            cat_fullname = product_to_cat_fullname[p]
+            p_name = product_to_name[p]
+            
+            st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
+            
