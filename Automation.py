@@ -1,9 +1,28 @@
 import streamlit as st
+import pandas as pd
 from collections import Counter
 
-st.title("Pallet Rule Assistant")
+st.title("Pallet Assistant (Category-based)")
 
-# === 所有 pallet 规则 ===
+# === 上传 Excel ===
+uploaded_file = st.file_uploader("上传 Excel 文件", type=["xlsx"])
+
+if not uploaded_file:
+    st.stop()
+
+# === 读取 Models 表 ===
+models = pd.read_excel(uploaded_file, sheet_name="Models")
+
+# 必须有这两列
+# Product code | Category
+product_to_category = dict(
+    zip(models["Product code"], models["Category"])
+)
+
+ALL_PRODUCTS = list(product_to_category.keys())
+ALL_CATEGORIES = set(product_to_category.values())
+
+# === Pallet 规则（Category 级） ===
 PALLET_RULES = [
     {"K1": 1},
     {"K2": 2},
@@ -34,17 +53,15 @@ PALLET_RULES = [
     {"A": 2, "K8": 2},
 ]
 
-ALL_PRODUCTS = sorted({p for rule in PALLET_RULES for p in rule.keys()})
+# === 判断函数 ===
+def can_add_category(current_cat_count, new_cat):
+    test = current_cat_count.copy()
+    test[new_cat] = test.get(new_cat, 0) + 1
 
-
-def can_add(current, product, rules):
-    test = current.copy()
-    test[product] = test.get(product, 0) + 1
-
-    for rule in rules:
+    for rule in PALLET_RULES:
         ok = True
-        for p, qty in test.items():
-            if rule.get(p, 0) < qty:
+        for cat, qty in test.items():
+            if rule.get(cat, 0) < qty:
                 ok = False
                 break
         if ok:
@@ -52,24 +69,31 @@ def can_add(current, product, rules):
     return False
 
 
-def allowed_products(current, products, rules):
-    return [p for p in products if can_add(current, p, rules)]
+# === 用户输入 ===
+st.subheader("当前 pallet 已放入的 Product code")
 
-
-# === 当前 pallet 状态 ===
-st.subheader("当前 pallet 内容")
-
-selected = st.multiselect(
-    "已放入的产品（可重复选）：",
+selected_products = st.multiselect(
+    "可重复选择 Product code：",
     ALL_PRODUCTS
 )
 
-current = dict(Counter(selected))
+# === 统计 Category 数量 ===
+current_categories = Counter(
+    product_to_category[p] for p in selected_products
+)
 
-st.write("当前数量：", current)
+st.write("当前 Category 数量：", dict(current_categories))
 
-# === 推荐 ===
-allowed = allowed_products(current, ALL_PRODUCTS, PALLET_RULES)
+# === 推荐还能放什么 Product ===
+allowed_products = []
 
-st.subheader("还可以继续放的产品：")
-st.write(allowed if allowed else "❌ 没有任何产品可以再放")
+for p in ALL_PRODUCTS:
+    cat = product_to_category[p]
+    if can_add_category(current_categories, cat):
+        allowed_products.append(p)
+
+st.subheader("还可以继续放入的 Product code：")
+if allowed_products:
+    st.write(allowed_products)
+else:
+    st.write("❌ 当前 pallet 已经满了，不能再放任何产品")
