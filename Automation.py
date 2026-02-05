@@ -56,14 +56,9 @@ PALLET_RULES = [
 # === Helper Functions ===
 
 def check_rules(cat_counts):
-    """
-    检查给定的分类数量是否符合任意一条规则。
-    返回 True 表示合法（在规则内），False 表示不合法（超载）。
-    """
     for rule in PALLET_RULES:
         is_rule_ok = True
         for cat, qty in cat_counts.items():
-            # 如果现有数量 > 规则允许数量，则该规则不适用
             if rule.get(cat, 0) < qty:
                 is_rule_ok = False
                 break
@@ -72,9 +67,6 @@ def check_rules(cat_counts):
     return False
 
 def get_allowed_products(current_counts):
-    """
-    基于当前状态，计算还有哪些产品可以添加。
-    """
     allowed = []
     for p in ALL_PRODUCTS:
         cat = product_to_category[p]
@@ -82,14 +74,12 @@ def get_allowed_products(current_counts):
         test_counts = current_counts.copy()
         test_counts[cat] = test_counts.get(cat, 0) + 1
         
-        # 检查添加后是否合法
         if check_rules(test_counts):
             allowed.append(p)
     return allowed
 
 # === User Input & Logic ===
 
-# 初始化 Session State 用于存储选择，以便我们能动态过滤选项
 if "selected_products" not in st.session_state:
     st.session_state["selected_products"] = []
 
@@ -100,7 +90,7 @@ current_counts = Counter(
     product_to_category[p] for p in st.session_state["selected_products"]
 )
 
-# 2. 计算当前合法的后续选项 (Lookahead)
+# 2. 计算当前合法的后续选项
 allowed_additions = get_allowed_products(current_counts)
 
 # 3. 构建 Multiselect 的选项列表
@@ -118,10 +108,10 @@ selected = st.multiselect(
     key="multiselect_widget" # 使用 key 让 Streamlit 自动更新 session_state
 )
 
-# 手动同步 session state (虽然使用了 key 通常会自动同步，但为了保险起见)
+# 手动同步 session state
 if selected != st.session_state["selected_products"]:
     st.session_state["selected_products"] = selected
-    st.rerun() # 重新运行以刷新列表逻辑
+    st.rerun()
 
 # === Status Calculation ===
 current_counts = Counter(
