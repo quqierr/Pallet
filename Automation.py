@@ -157,8 +157,7 @@ else:
             p_name = product_to_name[p]
             st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
             
-        if len(allowed_additions) > 10:
-            st.write(f"... and {len(allowed_additions)-10} more.")
+
             
 
             
