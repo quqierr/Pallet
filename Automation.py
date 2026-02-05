@@ -148,26 +148,27 @@ if not is_current_valid:
 elif is_current_valid and not can_add_more:
     st.success("✅ Pallet is full")
     st.caption("Maximum capacity reached. No other items can be added.")
-
-else: # is_current_valid and can_add_more
+    
+else: 
     st.info("✅ Pallet can still load")
     
-    
-with st.expander("Show available additions details"):
-       available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
+    with st.expander("Show available additions details"):
+        
+        available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
         
         st.write(f"**Available Categories to add:**")
         st.write(", ".join(available_names))
         
         st.write("---")
-        st.write("**Specific products:**")
+        st.write("**Specific products (Sample):**")
         
         for p in allowed_additions[:10]:
-            # 获取全称用于显示
             cat_fullname = product_to_cat_fullname[p]
             p_name = product_to_name[p]
-            
             st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
+            
+        if len(allowed_additions) > 10:
+            st.write(f"... and {len(allowed_additions)-10} more.")
             
 
             
