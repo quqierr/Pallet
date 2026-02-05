@@ -3,7 +3,7 @@ import pandas as pd
 from collections import Counter
 
 st.set_page_config(page_title="Pallet Assistant", page_icon="📦")
-st.title("📦 Pallet Assistant (Category-based)")
+st.title("📦 Pallet Assistant")
 
 # === Excel Sheet ===
 uploaded_file = st.file_uploader("Bitte Excel-Datei hochladen", type=["xlsx"])
