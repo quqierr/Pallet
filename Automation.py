@@ -21,9 +21,9 @@ def load_data(file):
     p_to_price = dict(zip(models["Product code"], models["Product price"]))
     p_to_cat_fullname = dict(zip(models["Product code"], models["Sub-Categories"]))
     all_prods = list(p_to_cat.keys())
-    return p_to_cat, p_to_name, p_to_price, all_prods
+    return p_to_cat, p_to_name, p_to_price, p_to_cat_fullname, all_prods
 
-product_to_category, product_to_name, product_to_price, ALL_PRODUCTS = load_data(uploaded_file)
+product_to_category, product_to_name, product_to_price, product_to_cat_fullname, ALL_PRODUCTS = load_data(uploaded_file)
 
 # === Rule Definition ===
 PALLET_RULES = [
