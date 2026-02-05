@@ -152,7 +152,7 @@ else:
         st.write("---")
         st.write("**Specific products (Sample):**")
         
-        for p in allowed_additions[:30]:
+        for p in allowed_additions[:60]:
             cat_fullname = product_to_cat_fullname[p]
             p_name = product_to_name[p]
             st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
