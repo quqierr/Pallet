@@ -2,17 +2,12 @@ import streamlit as st
 import pandas as pd
 from collections import Counter
 
-col1, col2 = st.columns([1, 8])
+col1, col2 = st.columns([1, 6])
 
 with col1:
     logo_path = "Logo.png" 
-    if os.path.exists(logo_path):
-        st.image(logo_path, width=70) # 主页面可以稍微大一点，设为 70
-    else:
-        st.write("🏢")
 
 with col2:
-    # 使用 <div> 和 margin 让文字和 Logo 视觉对齐
     st.markdown(
         """
         <div style="display: flex; align-items: center; height: 70px;">
