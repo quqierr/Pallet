@@ -2,6 +2,19 @@ import streamlit as st
 import pandas as pd
 from collections import Counter
 
+with st.sidebar:
+    col1, col2 = st.columns([1, 5])
+    
+    with col1:
+        # 替换为你的 logo 文件名或 URL
+        st.image("Logo.png", width=50) 
+        
+    with col2:
+        # 使用 markdown 让文字垂直居中一点，并加粗
+        st.markdown("### Play with the number ones")
+
+    st.divider()
+
 st.set_page_config(page_title="Pallet Assistant", page_icon="📦")
 st.title("📦 Pallet Assistant")
 
