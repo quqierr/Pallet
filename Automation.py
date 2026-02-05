@@ -2,16 +2,23 @@ import streamlit as st
 import pandas as pd
 from collections import Counter
 
-with st.sidebar:
-    col1, col2 = st.columns([1, 5])
-    
-    with col1:
-        st.image("Logo.png", width=50) 
-        
-    with col2:
-        st.markdown("### Play with the number ones")
+col1, col2 = st.columns([1, 8])
 
-    st.divider()
+with col1:
+    logo_path = "Logo.png" 
+
+with col2:
+    # 使用 <div> 和 margin 让文字和 Logo 视觉对齐
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; height: 70px;">
+            <h2 style="margin: 0;">Play with the number ones</h2>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+
+st.divider()
 
 st.set_page_config(page_title="Pallet Assistant", page_icon="📦")
 st.title("📦 Pallet Assistant")
