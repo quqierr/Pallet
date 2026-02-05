@@ -1,0 +1,57 @@
+import pandas as pd
+import streamlit as st
+
+st.title("Pallet Combination Assistant")
+
+
+uploaded_file = st.file_uploader("Upload Excel Sheet", type=["xlsx"])
+
+if uploaded_file:
+    models = pd.read_excel(uploaded_file, sheet_name="Models")
+    combination = pd.read_excel(uploaded_file, sheet_name="Combination")
+
+    # Rules
+    rules = []
+    for col in combination.columns:
+        products = combination[col].dropna().tolist()
+        for a in products:
+            for b in products:
+                if a != b:
+                    rules.append((a, b))
+    rules_df = pd.DataFrame(rules, columns=["Product_A", "Product_B"])
+
+    # Choose product
+    selected_products = st.multiselect(
+        "Product Code：",
+        models["Product code"].tolist()
+    )
+
+    # Product u can still put
+    def get_allowed_products(selected_products, remaining_space):
+        allowed = []
+
+        for _, row in models.iterrows():
+            product = row["Product code"]
+            capacity = row["Numbers on one pallet"]
+            needed_space = 1 / capacity
+
+            if needed_space > remaining_space:
+                continue
+
+            ok = True
+            for sel in selected_products:
+                if not (
+                    ((rules_df["Product_A"] == sel) & (rules_df["Product_B"] == product)).any()
+                ):
+                    ok = False
+                    break
+
+            if ok:
+                allowed.append(product)
+
+        return allowed
+
+    if selected_products:
+        allowed = get_allowed_products(selected_products, remaining)
+        st.subheader("Product choice left：")
+        st.write(allowed)
