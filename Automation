@@ -3,14 +3,14 @@ import streamlit as st
 
 st.title("Pallet Combination Assistant")
 
-
-uploaded_file = st.file_uploader("Upload Excel Sheet", type=["xlsx"])
+# 上传 Excel
+uploaded_file = st.file_uploader("上传 Excel 文件", type=["xlsx"])
 
 if uploaded_file:
     models = pd.read_excel(uploaded_file, sheet_name="Models")
     combination = pd.read_excel(uploaded_file, sheet_name="Combination")
 
-    # Rules
+    # 生成规则表
     rules = []
     for col in combination.columns:
         products = combination[col].dropna().tolist()
@@ -20,13 +20,22 @@ if uploaded_file:
                     rules.append((a, b))
     rules_df = pd.DataFrame(rules, columns=["Product_A", "Product_B"])
 
-    # Choose product
+    # 选择已放产品
     selected_products = st.multiselect(
-        "Product Code：",
+        "已放入 pallet 的产品：",
         models["Product code"].tolist()
     )
 
-    # Product u can still put
+    # 计算剩余空间
+    used = 0
+    for p in selected_products:
+        cap = models.loc[models["Product code"] == p, "Numbers on one pallet"].values[0]
+        used += 1 / cap
+
+    remaining = max(0, 1 - used)
+    st.write(f"剩余 pallet 空间：{round(remaining, 2)}")
+
+    # 推荐逻辑
     def get_allowed_products(selected_products, remaining_space):
         allowed = []
 
@@ -53,5 +62,5 @@ if uploaded_file:
 
     if selected_products:
         allowed = get_allowed_products(selected_products, remaining)
-        st.subheader("Product choice left：")
+        st.subheader("还能放的产品：")
         st.write(allowed)
