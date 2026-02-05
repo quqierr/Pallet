@@ -70,16 +70,10 @@ def can_add_category(current_cat_count, new_cat):
 st.subheader("Product in the Pallet")
 
 selected_products = st.multiselect(
-    "可重复选择 Product code：",
+    "Product in the Pallet：",
     ALL_PRODUCTS
 )
 
-# === 统计 Category 数量 ===
-current_categories = Counter(
-    product_to_category[p] for p in selected_products
-)
-
-st.write("当前 Category 数量：", dict(current_categories))
 
 # === 推荐还能放什么 Product ===
 allowed_products = []
@@ -89,8 +83,8 @@ for p in ALL_PRODUCTS:
     if can_add_category(current_categories, cat):
         allowed_products.append(p)
 
-st.subheader("还可以继续放入的 Product code：")
+st.subheader("Product to put：")
 if allowed_products:
     st.write(allowed_products)
 else:
-    st.write("❌ 当前 pallet 已经满了，不能再放任何产品")
+    st.write("Pallet is full")
