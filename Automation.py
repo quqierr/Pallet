@@ -152,11 +152,9 @@ elif is_current_valid and not can_add_more:
 else: # is_current_valid and can_add_more
     st.info("✅ Pallet can still load")
     
-
-  with st.expander("Show available additions details"):
-        
-
-        available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
+    
+with st.expander("Show available additions details"):
+       available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
         
         st.write(f"**Available Categories to add:**")
         st.write(", ".join(available_names))
@@ -170,4 +168,6 @@ else: # is_current_valid and can_add_more
             p_name = product_to_name[p]
             
             st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
+            
+
             
