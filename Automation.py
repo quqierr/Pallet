@@ -99,6 +99,9 @@ if "pallet_number" not in st.session_state:
 if "pallet_items" not in st.session_state:
     st.session_state["pallet_items"] = {}  # {product_code: qty}
 
+if "pallet_history" not in st.session_state:
+    st.session_state["pallet_history"] = [] 
+
 st.subheader(f"📦 Produkte auf Palette #{st.session_state['pallet_number']}")
 
 # --- Produkt auswählen ---
@@ -115,9 +118,20 @@ qty = st.number_input(
     step=1
 )
 
-if st.button("➕ Produkt hinzufügen / aktualisieren"):
-    st.session_state["pallet_items"][selected_sku] = qty
+if st.button("➕ Neue Palette hinzufügen"):
+    # 1️⃣ 保存当前托盘
+    st.session_state["pallet_history"].append(
+        st.session_state["pallet_items"].copy()
+    )
+
+    # 2️⃣ 清空当前托盘
+    st.session_state["pallet_items"] = {}
+
+    # 3️⃣ 托盘编号 +1
+    st.session_state["pallet_number"] += 1
+
     st.rerun()
+
 
 # --- Aktuelle Palette anzeigen ---
 if st.session_state["pallet_items"]:
@@ -188,7 +202,24 @@ else:
 if allowed_categories:
     with st.expander("Mögliche zusätzliche Kategorien"):
         st.write(", ".join(allowed_categories))
-            
+
+
+
+st.divider()
+st.subheader("📦 Bereits erstellte Paletten")
+
+if not st.session_state["pallet_history"]:
+    st.info("Noch keine abgeschlossenen Paletten.")
+else:
+    for i, pallet in enumerate(st.session_state["pallet_history"], start=1):
+        with st.expander(f"Palette #{i}"):
+            total = 0
+            for p, qty in pallet.items():
+                price = product_to_price[p] * qty
+                total += price
+                st.write(f"- **{p}** ({product_to_name[p]}) × {qty} → € {price:.2f}")
+
+            st.write(f"**Gesamtpreis Palette #{i}: € {total:.2f}**")
 
             
 
