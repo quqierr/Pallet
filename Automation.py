@@ -24,7 +24,7 @@ st.title("📦 Paletten-Assistent")
 st.subheader("Produkte auf der Palette")
 
 # === Excel Sheet ===
-EXCEL_PATH = "data.xlsx"
+EXCEL_PATH = "Expert Automation.xlsx"
 
 # === Caching Data for Performance ===
 @st.cache_data
