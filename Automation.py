@@ -27,7 +27,7 @@ st.markdown("""
     
     /* Roter Button (Leeren/Löschen) */
     div.stButton > button:contains("Leeren") {
-        color: #d9534f !important;
+        color: white !important;
         border: 1px solid #d9534f !important;
     }
 
@@ -101,7 +101,7 @@ with col_logo:
     except: st.title("📦")
 with col_text:
     st.write(f"### Pallet Management")
-    st.caption("Professionelles System zur Optimierung der Palettenauslastung")
+    st.caption("Play with the number ones")
 
 st.divider()
 
