@@ -5,7 +5,7 @@ from collections import Counter
 col1, col2 = st.columns([1, 6])
 
 with col1:
-    logo_path = "Logo.png" 
+    st.image("Logo.png", width=120)
 
 with col2:
     st.markdown(
@@ -20,19 +20,16 @@ with col2:
 st.divider()
 
 st.set_page_config(page_title="Pallet Assistant", page_icon="📦")
-st.title("📦 Pallet Assistant")
+st.title("📦 Paletten-Assistent")
+st.subheader("Produkte auf der Palette")
 
 # === Excel Sheet ===
-uploaded_file = st.file_uploader("Bitte Excel-Datei hochladen", type=["xlsx"])
-
-if not uploaded_file:
-    st.info("Bitte laden Sie eine Datei hoch, um zu beginnen.")
-    st.stop()
+EXCEL_PATH = "data.xlsx"
 
 # === Caching Data for Performance ===
 @st.cache_data
-def load_data(file):
-    models = pd.read_excel(file, sheet_name="Models")
+def load_data(file_path):
+    models = pd.read_excel(file_path, sheet_name="Models")
     p_to_cat = dict(zip(models["Product code"], models["Category code"]))
     p_to_name = dict(zip(models["Product code"], models["Product name"]))
     p_to_price = dict(zip(models["Product code"], models["Product price"]))
@@ -40,7 +37,8 @@ def load_data(file):
     all_prods = list(p_to_cat.keys())
     return p_to_cat, p_to_name, p_to_price, p_to_cat_fullname, all_prods
 
-product_to_category, product_to_name, product_to_price, product_to_cat_fullname, ALL_PRODUCTS = load_data(uploaded_file)
+product_to_category, product_to_name, product_to_price, product_to_cat_fullname, ALL_PRODUCTS = load_data(EXCEL_PATH)
+
 
 # === Rule Definition ===
 PALLET_RULES = [
@@ -87,7 +85,6 @@ def get_allowed_products(current_counts):
     allowed = []
     for p in ALL_PRODUCTS:
         cat = product_to_category[p]
-        # 模拟添加这个产品
         test_counts = current_counts.copy()
         test_counts[cat] = test_counts.get(cat, 0) + 1
         
@@ -95,69 +92,88 @@ def get_allowed_products(current_counts):
             allowed.append(p)
     return allowed
 
-# === User Input & Logic ===
+# === User Input & Logic (SKU + Menge) ===
 
-if "selected_products" not in st.session_state:
-    st.session_state["selected_products"] = []
+if "pallet_number" not in st.session_state:
+    st.session_state["pallet_number"] = 1
 
-st.subheader("Products already in the Pallet")
+if "pallet_items" not in st.session_state:
+    st.session_state["pallet_items"] = {}  # {product_code: qty}
 
-# 1. 计算当前已选的状态
-current_counts = Counter(
-    product_to_category[p] for p in st.session_state["selected_products"]
+st.subheader(f"📦 Produkte auf Palette #{st.session_state['pallet_number']}")
+
+# --- Produkt auswählen ---
+selected_sku = st.selectbox(
+    "Produkt auswählen",
+    options=ALL_PRODUCTS,
+    format_func=lambda x: f"{x} – {product_to_name.get(x, 'Unknown')}"
 )
 
-# 2. 计算当前合法的后续选项
-allowed_additions = get_allowed_products(current_counts)
-
-# 3. 构建 Multiselect 的选项列表
-
-valid_options = list(set(st.session_state["selected_products"]) | set(allowed_additions))
-
-# 4. 渲染 Multiselect
-valid_options.sort()
-
-selected = st.multiselect(
-    "Select Product code (Dynamically filtered):",
-    options=valid_options,
-    default=st.session_state["selected_products"],
-    format_func=lambda x: f"{x} – {product_to_name.get(x, 'Unknown')}",
-    key="multiselect_widget" # 使用 key 让 Streamlit 自动更新 session_state
+qty = st.number_input(
+    "Menge",
+    min_value=1,
+    max_value=50,
+    step=1
 )
 
-# 手动同步 session state
-if selected != st.session_state["selected_products"]:
-    st.session_state["selected_products"] = selected
+if st.button("➕ Produkt hinzufügen / aktualisieren"):
+    st.session_state["pallet_items"][selected_sku] = qty
     st.rerun()
 
+# --- Aktuelle Palette anzeigen ---
+if st.session_state["pallet_items"]:
+    st.write("### Aktuelle Paletteninhalte")
+
+    for p, q in st.session_state["pallet_items"].items():
+        st.write(f"- **{p}** ({product_to_name[p]}) × {q}")
+
+    if st.button("🗑️ Palette leeren"):
+        st.session_state["pallet_items"] = {}
+        st.rerun()
+
 # === Status Calculation ===
-current_counts = Counter(
-    product_to_category[p] for p in selected
+current_counts = Counter()
+
+for p, qty in st.session_state["pallet_items"].items():
+    cat = product_to_category[p]
+    current_counts[cat] += qty
+
+is_current_valid = check_rules(current_counts)
+
+# 判断还能不能再加 1 件任意 SKU
+can_add_more = False
+for p in ALL_PRODUCTS:
+    test_counts = current_counts.copy()
+    test_counts[product_to_category[p]] += 1
+    if check_rules(test_counts):
+        can_add_more = True
+        break
+
+# 价格
+total_price = sum(
+    product_to_price[p] * qty
+    for p, qty in st.session_state["pallet_items"].items()
 )
 
-# 核心状态判断逻辑
-is_current_valid = check_rules(current_counts)
-can_add_more = len(allowed_additions) > 0
-
-st.divider()
-
-
-# 计算价格
-total_price = sum(product_to_price.get(p, 0) for p in selected)
-st.write(f"💰 **Total Pallet Price: € {total_price:.2f}**")
+st.write(f"💰 **Gesamtpreis der Palette: € {total_price:.2f}**")
 
 st.subheader("Status")
 
 if not is_current_valid:
-    st.error("❌ Pallet is exceeded capacity")
-    st.caption("The current combination does not match any allowed rule.")
+    st.error("❌ Palette ist überladen")
+    st.caption("Die aktuelle Kombination entspricht keiner zulässigen Palettenregel.")
 
 elif is_current_valid and not can_add_more:
-    st.success("✅ Pallet is full")
-    st.caption("Maximum capacity reached. No other items can be added.")
-    
-else: 
-    st.info("✅ Pallet can still load")
+    st.success("✅ Palette ist voll")
+    st.caption("Maximale Kapazität erreicht.")
+
+    if st.button("➕ Neue Palette hinzufügen"):
+        st.session_state["pallet_items"] = {}
+        st.session_state["pallet_number"] += 1
+        st.rerun()
+
+else:
+    st.info("✅ Palette kann weiter beladen werden")
     
     with st.expander("Show available additions details"):
         
