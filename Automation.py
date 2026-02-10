@@ -90,17 +90,35 @@ if "pallet_items" not in st.session_state: st.session_state["pallet_items"] = {}
 if "pallet_history" not in st.session_state: st.session_state["pallet_history"] = []
 
 # === 4. UI Header (Logo + Titel kombiniert) ===
-col_logo, col_title = st.columns([1, 3])
-with col_logo:
-    try:
-        st.image("Logo 2.png", width=200) # Angemessene Größe
-    except:
-        st.write("### [LOGO]")
+import base64
 
-with col_title:
-    # Haupttitel groß, Untertitel als Markdown darunter
-    st.title("Paletten-Management")
-    st.markdown("<p style='font-size: 20px; color: #666666; margin-top: -15px;'>Play with the number ones</p>", unsafe_allow_html=True)
+def get_base64(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# Logo laden und in Base64 konvertieren (um es direkt im HTML zu nutzen)
+try:
+    logo_base64 = get_base64("Logo 2.png")
+    logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="200">'
+except:
+    logo_html = '<div style="font-size:30px; font-weight:bold;">[LOGO]</div>'
+
+# Der kombinierte Flexbox-Header
+st.markdown(
+    f"""
+    <div style="display: flex; align-items: center; gap: 30px; margin-bottom: 20px;">
+        <div>
+            {logo_html}
+        </div>
+        <div style="display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="margin: 0; padding: 0; line-height: 1.2; font-size: 42px;">Paletten-Management</h1>
+            <p style="margin: 0; padding: 0; font-size: 20px; color: #666666;">Play with the number ones</p>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.divider()
 
