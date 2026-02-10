@@ -136,37 +136,49 @@ with col1:
     st.subheader(f"📍 Aktuelle Palette #{st.session_state['pallet_number']}")
     
     with st.container():
-        # 1. Auswahlbox für Produkte (zeigt nur Produkte, die theoretisch noch Platz haben)
-        selected_sku = st.selectbox(
-            "Produkt wählen", 
-            options=allowed_products, 
-            format_func=lambda x: f"{x} – {product_to_name.get(x, '')}"
-        )
-        
-        # 2. Mengeneingabe
-        qty = st.number_input("Menge", min_value=1, max_value=50, step=1)
-        
-        # --- LOGIK-PRÜFUNG FÜR DIE GEWÄHLTE MENGE ---
-        test_counts = current_counts.copy()
-        test_counts[product_to_category[selected_sku]] += qty
-        is_qty_allowed = check_rules(test_counts)
-        # --------------------------------------------
+        if not allowed_products:
+            st.success("Diese Palette ist optimal ausgelastet.")
+            # Falls die Palette voll ist, definieren wir Variablen als Platzhalter
+            selected_sku = None
+            is_qty_allowed = False
+        else:
+            selected_sku = st.selectbox(
+                "Produkt wählen", 
+                options=allowed_products, 
+                format_func=lambda x: f"{x} – {product_to_name.get(x, '')}"
+            )
+            qty = st.number_input("Menge", min_value=1, max_value=50, step=1)
+            
+            # --- SICHERHEITS-CHECK GEGEN KEYERROR ---
+            if selected_sku:
+                test_counts = current_counts.copy()
+                # Wir holen die Kategorie sicher ab
+                cat = product_to_category.get(selected_sku)
+                test_counts[cat] += qty
+                is_qty_allowed = check_rules(test_counts)
+            else:
+                is_qty_allowed = False
+            # ----------------------------------------
 
-        if not is_qty_allowed:
-            st.error(f"❌ {qty}x {selected_sku} passt nicht mehr auf die Palette!")
+            if not is_qty_allowed and selected_sku:
+                st.error(f"❌ {qty} Einheiten passen nicht mehr auf die Palette!")
         
-        # Buttons in einer Zeile
-        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1])
+        st.write("") # Abstand
+
+        # --- Button Reihe ---
+        btn_col1, btn_col2, btn_col3 = st.columns(3)
         
         with btn_col1:
-            # Button ist nur klickbar, wenn die Menge auch wirklich erlaubt ist
-            if st.button("➕ Hinzufügen", type="primary", use_container_width=True, disabled=not is_qty_allowed):
+            # Button nur aktiv, wenn ein Produkt gewählt UND die Menge erlaubt ist
+            can_add = selected_sku is not None and is_qty_allowed
+            if st.button("➕ Hinzufügen", type="primary", use_container_width=True, disabled=not can_add):
                 st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
                 st.rerun()
         
         with btn_col2:
-            # Speichern-Button hier integriert für bessere Symmetrie
-            if st.button("💾 Speichern", use_container_width=True, disabled=not st.session_state["pallet_items"]):
+            # Speichern nur aktiv, wenn die Palette nicht leer ist
+            has_items = len(st.session_state["pallet_items"]) > 0
+            if st.button("💾 Speichern", use_container_width=True, disabled=not has_items):
                 total_price = sum(product_to_price[p] * q for p, q in st.session_state["pallet_items"].items())
                 st.session_state["pallet_history"].append({
                     "id": st.session_state["pallet_number"], 
@@ -181,8 +193,6 @@ with col1:
                 st.session_state["pallet_items"] = {}
                 st.rerun()
 
-with col2:
-    st.subheader("📝 Ladungsübersicht")
 
 
 # Historie
