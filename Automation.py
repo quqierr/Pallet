@@ -123,8 +123,7 @@ with col1:
 
     if not moegliche_produkte:
         # === 这里改成了绿色成功提示和对勾 ===
-        st.success("✅ **Palette ist optimal ausgelastet!**")
-        st.info("Diese Palette hat ihr Limit erreicht und kann gespeichert werden.")
+        st.success("✅ **Palette ist optimal ausgelastet und kann gespeichert werden!**")
         gewaehlte_sku = None
         menge_erlaubt = False
     else:
