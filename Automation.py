@@ -207,7 +207,7 @@ with col2:
         st.markdown(f"""
             <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
                 <span style="font-size: 16px; color: #666666;">Gesamtwert der aktuellen Palette:</span><br>
-                <span style="font-size: 24px; font-weight: bold; color: #1a4a73;">{total_summe:,.2f} €</span>
+                <span style="font-size: 24px; font-weight: bold; color: #0C5CA8;">{total_summe:,.2f} €</span>
             </div>
         """, unsafe_allow_html=True)
         
