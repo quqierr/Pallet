@@ -3,7 +3,7 @@ import pandas as pd
 from collections import Counter
 
 # === 1. Konfiguration & Custom Styling ===
-st.set_page_config(page_title="Paletten-Assistent PRO", page_icon="📦", layout="wide")
+st.set_page_config(page_title="Paletten-Assistent", page_icon="📦", layout="wide")
 
 # Custom CSS für professionelle Farben und Buttons
 st.markdown("""
@@ -95,12 +95,12 @@ if "pallet_history" not in st.session_state: st.session_state["pallet_history"] 
 # === 5. UI Layout ===
 
 # Header
-col_logo, col_text = st.columns([1, 5])
+col_logo, col_text = st.columns([1, 3])
 with col_logo:
-    try: st.image("Logo.png", width=120)
+    try: st.image("Logo.png", width=150)
     except: st.title("📦")
 with col_text:
-    st.write(f"### Expert Automation Pallet Management")
+    st.write(f"### Pallet Management")
     st.caption("Professionelles System zur Optimierung der Palettenauslastung")
 
 st.divider()
@@ -122,7 +122,7 @@ for p in ALL_PRODUCTS:
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"📍 Aktuelle Palette #{st.session_state['pallet_number']}")
+    st.subheader(f"Aktuelle Palette #{st.session_state['pallet_number']}")
     
     with st.container(border=True):
         if not allowed_products:
@@ -155,7 +155,7 @@ with col1:
         st.success("Palette ist voll (Regelkonform).")
 
 with col2:
-    st.subheader("📝 Ladungsübersicht")
+    st.subheader("Ladungsübersicht")
     
     if st.session_state["pallet_items"]:
         # Daten für Tabelle aufbereiten
