@@ -177,7 +177,7 @@ with col1:
             st.rerun()
 
 with col2:
-    st.subheader("📝 Ladungsübersicht")
+    st.subheader("Ladungsübersicht")
     
     if st.session_state["waren_auf_palette"]:
         df_list = []
@@ -206,7 +206,7 @@ with col2:
         total_summe = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
         st.markdown(f"""
             <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
-                <span style="font-size: 16px; color: #666666;">Gesamtwert:</span><br>
+                <span style="font-size: 16px; color: #666666;">Gesamtwert der aktuellen Palette:</span><br>
                 <span style="font-size: 24px; font-weight: bold; color: #1a4a73;">{total_summe:,.2f} €</span>
             </div>
         """, unsafe_allow_html=True)
