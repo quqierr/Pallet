@@ -215,42 +215,16 @@ with col2:
         st.info("Die Palette ist leer.")
 
 # === 7. Historie ===
-# === 7. Historie / Palettenübersicht ===
 st.divider()
-st.subheader("📋 Palettenübersicht (Verlauf)")
-
-if not st.session_state["verlauf"]:
-    st.info("Keine abgeschlossenen Paletten vorhanden.")
-else:
-    # 1. 循环显示每一个历史托盘卡片
-    for e in reversed(st.session_state["verlauf"]):
-        with st.container(border=True):
-            st.markdown(f"**📦 Palette #{e['id']}**")
-            
-            # 准备表格数据
-            h_df_list = []
-            for sku, q in e['items'].items():
-                h_df_list.append({
-                    "SKU": str(sku),
-                    "Name": str(produkt_zu_name.get(sku, "Unbekannt")),
-                    "Menge": f"{q} Stk."
-                })
-            
-            # 显示表格（靠左对齐，隐藏索引）
-            st.dataframe(
-                pd.DataFrame(h_df_list), 
-                use_container_width=True, 
-                hide_index=True
-            )
-            
-            # 单个托盘的总价（模仿 Ladungsübersicht 放在右下角）
-            st.markdown(f"""
-                <div style="text-align: right; padding-top: 5px;">
-                    <span style="font-size: 14px; color: #666666;">Palettenwert:</span>
-                    <span style="font-size: 18px; font-weight: bold; color: #1a4a73; margin-left: 10px;">{e['total']:,.2f} €</span>
-                </div>
-            """, unsafe_allow_html=True)
-
+st.subheader("Palettenübersicht")
+for e in reversed(st.session_state["verlauf"]):
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        c1.write(f"**Palette #{e['id']}**")
+        c2.markdown(f"<p style='text-align:right;'><b>{e['total']:,.2f} €</b></p>", unsafe_allow_html=True)
+        h_df = [{"Produkt": produkt_zu_name.get(s), "Menge": q} for s, q in e['items'].items()]
+        st.dataframe(pd.DataFrame(h_df), use_container_width=True, hide_index=True)
+        
     # 2. 在所有托盘列表的最下方，显示一个最终的总计（所有托盘加起来）
     st.write("") # 留点间距
     gesamt_aller_paletten = sum(e["total"] for e in st.session_state["verlauf"])
