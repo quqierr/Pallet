@@ -20,7 +20,7 @@ st.markdown("""
     
     /* Primärer Button (Hinzufügen / Speichern) */
     div[data-testid="stBaseButton-primary"] {
-        background-color: #1a4a73 !important;
+        background-color: white !important;
         border: none !important;
         color: white !important;
     }
