@@ -5,7 +5,7 @@ from collections import Counter
 col1, col2 = st.columns([1, 6])
 
 with col1:
-    st.image("Logo.png", width=200)
+    st.image("Logo.png", width=500)
 
 with col2:
     st.markdown(
@@ -21,7 +21,6 @@ st.divider()
 
 st.set_page_config(page_title="Pallet Assistant", page_icon="📦")
 st.title("📦 Paletten-Assistent")
-st.subheader("Produkte auf der Palette")
 
 # === Excel Sheet ===
 EXCEL_PATH = "Expert Automation.xlsx"
