@@ -93,7 +93,7 @@ if "pallet_history" not in st.session_state: st.session_state["pallet_history"] 
 col_logo, col_title = st.columns([1, 3])
 with col_logo:
     try:
-        st.image("Logo 2.png", width=400) # Angemessene Größe
+        st.image("Logo 2.png", width=350) # Angemessene Größe
     except:
         st.write("### [LOGO]")
 
