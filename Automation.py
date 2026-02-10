@@ -115,7 +115,7 @@ allowed_products = [p for p in ALL_PRODUCTS if check_rules({**current_counts, pr
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"📍 Aktuelle Palette #{st.session_state['pallet_number']}")
+    st.subheader(f"Aktuelle Palette #{st.session_state['pallet_number']}")
     
     with st.container():
         if not allowed_products:
@@ -124,16 +124,16 @@ with col1:
             selected_sku = st.selectbox("Produkt wählen", options=allowed_products, format_func=lambda x: f"{x} – {product_to_name.get(x, '')}")
             qty = st.number_input("Menge", min_value=1, max_value=24, step=1)
             
-            if st.button("➕ Zum Auftrag hinzufügen", type="primary"):
+            if st.button("Zum Auftrag hinzufügen", type="primary"):
                 st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
                 st.rerun()
 
-    if st.button("🗑️ Palette leeren"):
+    if st.button("Palette leeren"):
         st.session_state["pallet_items"] = {}
         st.rerun()
 
 with col2:
-    st.subheader("📝 Ladungsübersicht")
+    st.subheader("Ladungsübersicht")
     if st.session_state["pallet_items"]:
         table_data = [{"SKU": p, "Name": product_to_name[p], "Menge": q, "Einzelpreis": f"{product_to_price[p]:,.2f} €", "Summe": f"{product_to_price[p]*q:,.2f} €"} 
                       for p, q in st.session_state["pallet_items"].items()]
@@ -142,7 +142,7 @@ with col2:
         total_price = sum(product_to_price[p] * q for p, q in st.session_state["pallet_items"].items())
         st.markdown(f"### **Gesamtwert: {total_price:,.2f} €**")
         
-        if st.button("💾 Palette abschließen & Speichern", type="primary"):
+        if st.button("Palette abschließen & Speichern", type="primary"):
             st.session_state["pallet_history"].append({
                 "id": st.session_state["pallet_number"], 
                 "items": st.session_state["pallet_items"].copy(), 
