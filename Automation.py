@@ -124,7 +124,7 @@ with col1:
     if not moegliche_produkte:
         # === 这里改成了绿色成功提示和对勾 ===
         st.success("✅ **Palette ist optimal ausgelastet!**")
-        st.info("Bitte klicken Sie auf „💾 Speichern“, um zu speichern..")
+        st.info("Bitte klicken Sie auf „💾 Speichern“, um zu speichern.")
         gewaehlte_sku = None
         gewaehlte_sku = None
         menge_erlaubt = False
@@ -180,39 +180,43 @@ with col2:
     st.subheader("📝 Ladungsübersicht")
     
     if st.session_state["waren_auf_palette"]:
-        # 将当前托盘上的物品转换为 DataFrame
         df_list = []
         for p, q in st.session_state["waren_auf_palette"].items():
             einzelpreis = produkt_zu_preis.get(p, 0)
             df_list.append({
-                "SKU": p, 
-                "Name": produkt_zu_name.get(p, "Unbekannt"), 
+                "SKU": str(p), 
+                "Name": str(produkt_zu_name.get(p, "Unbekannt")), 
                 "Menge": f"{q} Stk.", 
                 "Gesamtpreis": f"{einzelpreis * q:,.2f} €"
             })
         
-        # 使用 dataframe 替代 table，并隐藏左侧索引数字
+        df_display = pd.DataFrame(df_list)
         st.dataframe(
-            pd.DataFrame(df_list), 
+            df_display, 
             use_container_width=True, 
-            hide_index=True
+            hide_index=True,
+            column_config={
+                "SKU": st.column_config.TextColumn("SKU"),
+                "Name": st.column_config.TextColumn("Name"),
+                "Menge": st.column_config.TextColumn("Menge"),
+                "Gesamtpreis": st.column_config.TextColumn("Gesamtpreis")
+            }
         )
         
-        # 在表格下方显示一个总价汇总
         total_summe = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
         st.markdown(f"""
             <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
-                <span style="font-size: 18px; color: #666666;">Gesamtwert der aktuellen Palette:</span><br>
-                <span style="font-size: 28px; font-weight: bold; color: #1a4a73;">{total_summe:,.2f} €</span>
+                <span style="font-size: 16px; color: #666666;">Gesamtwert:</span><br>
+                <span style="font-size: 24px; font-weight: bold; color: #1a4a73;">{total_summe:,.2f} €</span>
             </div>
         """, unsafe_allow_html=True)
         
     else:
-        st.info("Die Palette ist leer. Fügen Sie Produkte hinzu, um die Übersicht zu sehen.")
+        st.info("Die Palette ist leer.")
 
 # === 7. Historie ===
 st.divider()
-st.subheader("Palettenübersicht)")
+st.subheader("Palettenübersicht")
 for e in reversed(st.session_state["verlauf"]):
     with st.container(border=True):
         c1, c2 = st.columns(2)
