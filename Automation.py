@@ -113,7 +113,7 @@ for p, q in st.session_state["waren_auf_palette"].items():
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"📍 Aktuelle Palette #{st.session_state['palette_nr']}")
+    st.subheader(f"Aktuelle Palette #{st.session_state['palette_nr']}")
     
     # 计算当前哪些产品还能加进去
     moegliche_produkte = [
@@ -123,7 +123,9 @@ with col1:
 
     if not moegliche_produkte:
         # === 这里改成了绿色成功提示和对勾 ===
-        st.success("✅ **Palette ist optimal ausgelastet und kann gespeichert werden!**")
+        st.success("✅ **Palette ist optimal ausgelastet!**")
+        st.info("Bitte klicken Sie auf „💾 Speichern“, um zu speichern..")
+        gewaehlte_sku = None
         gewaehlte_sku = None
         menge_erlaubt = False
     else:
@@ -176,22 +178,41 @@ with col1:
 
 with col2:
     st.subheader("📝 Ladungsübersicht")
+    
     if st.session_state["waren_auf_palette"]:
-        # 显示当前托盘分类汇总，方便调试规则
-        with st.expander("Kategorien-Check (Debug)"):
-            for k, v in aktuelle_counts.items():
-                st.write(f"Kategorie {k}: {v} Stk.")
+        # 将当前托盘上的物品转换为 DataFrame
+        df_list = []
+        for p, q in st.session_state["waren_auf_palette"].items():
+            einzelpreis = produkt_zu_preis.get(p, 0)
+            df_list.append({
+                "SKU": p, 
+                "Name": produkt_zu_name.get(p, "Unbekannt"), 
+                "Menge": f"{q} Stk.", 
+                "Gesamtpreis": f"{einzelpreis * q:,.2f} €"
+            })
         
-        df_list = [{"SKU": p, "Name": produkt_zu_name.get(p), "Menge": q, 
-                    "Summe": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"} 
-                   for p, q in st.session_state["waren_auf_palette"].items()]
-        st.table(pd.DataFrame(df_list))
+        # 使用 dataframe 替代 table，并隐藏左侧索引数字
+        st.dataframe(
+            pd.DataFrame(df_list), 
+            use_container_width=True, 
+            hide_index=True
+        )
+        
+        # 在表格下方显示一个总价汇总
+        total_summe = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+        st.markdown(f"""
+            <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
+                <span style="font-size: 18px; color: #666666;">Gesamtwert der aktuellen Palette:</span><br>
+                <span style="font-size: 28px; font-weight: bold; color: #1a4a73;">{total_summe:,.2f} €</span>
+            </div>
+        """, unsafe_allow_html=True)
+        
     else:
-        st.info("Palette ist leer.")
+        st.info("Die Palette ist leer. Fügen Sie Produkte hinzu, um die Übersicht zu sehen.")
 
 # === 7. Historie ===
 st.divider()
-st.subheader("📋 Palettenübersicht (Verlauf)")
+st.subheader("Palettenübersicht)")
 for e in reversed(st.session_state["verlauf"]):
     with st.container(border=True):
         c1, c2 = st.columns(2)
