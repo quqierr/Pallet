@@ -52,7 +52,7 @@ def lade_daten(datei_pfad):
 
 produkt_zu_kategorie, produkt_zu_name, produkt_zu_preis, ALLE_PRODUKTE = lade_daten(EXCEL_PFAD)
 
-# === 3. Optimierte Logik (修复 3 台报错的问题) ===
+# === 3. 核心逻辑：规则校验 (严格按照组合校验) ===
 PALETTEN_REGELN = [
     {"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24}, {"K8": 6}, {"S": 4}, {"A": 4},
     {"T4": 4}, {"T2": 2}, {"8888": 2}, {"A": 3, "S": 1}, {"A": 2, "S": 2}, {"A": 1, "S": 3},
@@ -61,12 +61,23 @@ PALETTEN_REGELN = [
     {"KB": 1, "B": 1, "A": 1, "K6": 1}, {"KB": 1, "B": 1, "S": 1, "K6": 1}, {"A": 2, "K8": 2},
 ]
 
-def pruefe_menge_erlaubt(kategorie, neue_gesamtmenge):
+def check_palette_valid(test_counts):
     """
-    检查特定分类的总数是否超过了该分类在所有规则中的最大允许值。
+    核心逻辑：检查模拟添加后的完整组合（test_counts）是否符合任一预设规则。
     """
-    max_erlaubt = max([r.get(kategorie, 0) for r in PALETTEN_REGELN])
-    return neue_gesamtmenge <= max_erlaubt
+    if not test_counts: return True
+    for regel in PALETTEN_REGELN:
+        ist_regel_erfuellt = True
+        # 检查当前清单中的每种分类，是否都在该规则允许的范围内
+        for kat, menge in test_counts.items():
+            if menge > regel.get(kat, 0):
+                ist_regel_erfuellt = False
+                break
+        
+        # 还要检查规则中没提到的分类在当前清单中是否为0 (上面已隐含判断)
+        if ist_regel_erfuellt:
+            return True
+    return False
 
 # === 4. Session State ===
 if "palette_nr" not in st.session_state: st.session_state["palette_nr"] = 1
@@ -94,6 +105,7 @@ st.markdown(f"""
 st.divider()
 
 # === 6. Haupt-Layout ===
+# 计算当前托盘上各分类的数量
 aktuelle_counts = Counter()
 for p, q in st.session_state["waren_auf_palette"].items():
     aktuelle_counts[produkt_zu_kategorie[p]] += q
@@ -101,36 +113,39 @@ for p, q in st.session_state["waren_auf_palette"].items():
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f" Aktuelle Palette #{st.session_state['palette_nr']}")
+    st.subheader(f"📍 Aktuelle Palette #{st.session_state['palette_nr']}")
     
-    # 过滤掉已经达到上限的产品
+    # 过滤掉完全无法再添加的产品（哪怕加1个都不行的产品）
     moegliche_produkte = [
         p for p in ALLE_PRODUKTE 
-        if pruefe_menge_erlaubt(produkt_zu_kategorie[p], aktuelle_counts[produkt_zu_kategorie[p]] + 1)
+        if check_palette_valid({**aktuelle_counts, produkt_zu_kategorie[p]: aktuelle_counts[produkt_zu_kategorie[p]] + 1})
     ]
 
     if not moegliche_produkte:
-        st.success("Die Palette ist voll.")
+        st.warning("⚠️ Keine weiteren Produkte möglich. Palette ist voll oder keine Regel passt.")
         gewaehlte_sku = None
     else:
         gewaehlte_sku = st.selectbox("Produkt wählen", options=moegliche_produkte, 
                                      format_func=lambda x: f"{x} – {produkt_zu_name.get(x, '')}")
         menge = st.number_input("Menge", min_value=1, max_value=50, value=1)
 
-        # 实时校验输入数量
+        # --- 校验添加该数量后是否合法 ---
         if gewaehlte_sku:
+            test_counts = aktuelle_counts.copy()
             kat = produkt_zu_kategorie[gewaehlte_sku]
-            menge_erlaubt = pruefe_menge_erlaubt(kat, aktuelle_counts[kat] + menge)
+            test_counts[kat] += menge
+            
+            menge_erlaubt = check_palette_valid(test_counts)
+            
+            if not menge_erlaubt:
+                # 计算这个分类在当前组合下还能放多少个
+                st.error(f"❌ Kombination nicht erlaubt oder Limit überschritten!")
         else:
             menge_erlaubt = False
 
-        if not menge_erlaubt:
-            st.error(f"❌ Limit überschritten! Maximal {max([r.get(kat, 0) for r in PALETTEN_REGELN])} Einheiten erlaubt.")
-
     st.write("") 
 
-    # --- 按钮布局调整 ---
-    # 使用 4 列：Hinzufügen | Leeren | (Gap) | Speichern
+    # --- 按钮布局调整: Hinzufügen | Leeren | (Gap) | Speichern ---
     b_col1, b_col2, b_gap, b_col3 = st.columns([1, 1, 0.2, 1])
     
     with b_col1:
@@ -160,8 +175,13 @@ with col1:
             st.rerun()
 
 with col2:
-    st.subheader(" Ladungsübersicht")
+    st.subheader("📝 Ladungsübersicht")
     if st.session_state["waren_auf_palette"]:
+        # 显示当前托盘分类汇总，方便调试规则
+        with st.expander("Kategorien-Check (Debug)"):
+            for k, v in aktuelle_counts.items():
+                st.write(f"Kategorie {k}: {v} Stk.")
+        
         df_list = [{"SKU": p, "Name": produkt_zu_name.get(p), "Menge": q, 
                     "Summe": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"} 
                    for p, q in st.session_state["waren_auf_palette"].items()]
@@ -171,7 +191,7 @@ with col2:
 
 # === 7. Historie ===
 st.divider()
-st.subheader(" Palettenübersicht")
+st.subheader("📋 Palettenübersicht (Verlauf)")
 for e in reversed(st.session_state["verlauf"]):
     with st.container(border=True):
         c1, c2 = st.columns(2)
