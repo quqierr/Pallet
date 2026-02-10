@@ -97,7 +97,7 @@ for p, q in st.session_state["waren_auf_palette"].items():
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"📍 Aktuelle Palette #{st.session_state['palette_nr']}")
+    st.subheader(f" Aktuelle Palette #{st.session_state['palette_nr']}")
     
     # 过滤掉已经达到上限的产品
     moegliche_produkte = [
@@ -156,7 +156,7 @@ with col1:
             st.rerun()
 
 with col2:
-    st.subheader("📝 Ladungsübersicht")
+    st.subheader(" Ladungsübersicht")
     if st.session_state["waren_auf_palette"]:
         df_list = [{"SKU": p, "Name": produkt_zu_name.get(p), "Menge": q, 
                     "Summe": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"} 
@@ -167,7 +167,7 @@ with col2:
 
 # === 7. Historie ===
 st.divider()
-st.subheader("📋 Historie")
+st.subheader(" Palettenübersicht")
 for e in reversed(st.session_state["verlauf"]):
     with st.container(border=True):
         c1, c2 = st.columns(2)
