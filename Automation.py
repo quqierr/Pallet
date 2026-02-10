@@ -1,24 +1,16 @@
 import streamlit as st
 import pandas as pd
 from collections import Counter
+import base64
 
-# === 1. Konfiguration & Minimalist White Styling ===
+# === 1. Konfiguration & Styling (白色简约风格) ===
 st.set_page_config(page_title="Paletten-Assistent PRO", page_icon="📦", layout="wide")
 
 st.markdown("""
     <style>
-    /* Haupt-Hintergrund auf Weiß */
     .stApp { background-color: #FFFFFF; }
     
-    /* Header-Bereich Styling */
-    .header-box {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        padding-bottom: 20px;
-    }
-
-    /* Buttons: Weißer Hintergrund, schwarze Schrift, grauer Rahmen */
+    /* 按钮基础样式 */
     div.stButton > button {
         background-color: #FFFFFF !important;
         color: #333333 !important;
@@ -34,201 +26,187 @@ st.markdown("""
         background-color: #F9F9F9 !important;
     }
 
-    /* Primärer Button (Hinzufügen & Abschließen) */
+    /* 重点按钮（Hinzufügen）样式 */
     div[data-testid="stBaseButton-primary"] {
         font-weight: bold !important;
         border: 2px solid #333333 !important;
     }
-
-    /* Tabellen Styling */
-    .stTable { background-color: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# === 2. Daten laden ===
-EXCEL_PATH = "Expert Automation.xlsx"
+# === 2. Daten laden (从 Excel 加载数据) ===
+EXCEL_PFAD = "Expert Automation.xlsx"
 
 @st.cache_data
-def load_data(file_path):
+def lade_daten(datei_pfad):
     try:
-        models = pd.read_excel(file_path, sheet_name="Models")
+        df = pd.read_excel(datei_pfad, sheet_name="Models")
     except Exception:
-        # Dummy Daten falls Excel nicht da
+        # 备用数据（如果文件丢失）
         data = {
-            "Product code": ["SKU-01", "SKU-02", "SKU-03"],
-            "Category code": ["A", "B", "K6"],
-            "Product name": ["Produkt Alpha", "Steuerung Beta", "Kabel K6"],
-            "Product price": [450.0, 120.0, 45.0],
-            "Sub-Categories": ["A-Klasse", "B-Klasse", "Zubehör"]
+            "Product code": ["SKU-01", "SKU-02"],
+            "Category code": ["A", "B"],
+            "Product name": ["Beispiel Produkt A", "Beispiel Produkt B"],
+            "Product price": [100.0, 200.0]
         }
-        models = pd.DataFrame(data)
+        df = pd.DataFrame(data)
     
-    p_to_cat = dict(zip(models["Product code"], models["Category code"]))
-    p_to_name = dict(zip(models["Product code"], models["Product name"]))
-    p_to_price = dict(zip(models["Product code"], models["Product price"]))
-    all_prods = list(p_to_cat.keys())
-    return p_to_cat, p_to_name, p_to_price, all_prods
+    p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
+    p_zu_name = dict(zip(df["Product code"], df["Product name"]))
+    p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
+    alle_produkte = list(p_zu_kat.keys())
+    return p_zu_kat, p_zu_name, p_zu_preis, alle_produkte
 
-product_to_category, product_to_name, product_to_price, ALL_PRODUCTS = load_data(EXCEL_PATH)
+produkt_zu_kategorie, produkt_zu_name, produkt_zu_preis, ALLE_PRODUKTE = lade_daten(EXCEL_PFAD)
 
-# Regelwerk (Beispielhaft)
-PALLET_RULES = [{"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24}, {"K8": 6}, {"S": 4}, {"A": 4}]
+# === 3. Paletten-Regeln (校验逻辑) ===
+PALETTEN_REGELN = [
+    {"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24}, {"K8": 6}, {"S": 4}, {"A": 4}
+]
 
-def check_rules(cat_counts):
-    for rule in PALLET_RULES:
-        is_rule_ok = True
-        for cat, qty in cat_counts.items():
-            if rule.get(cat, 0) < qty:
-                is_rule_ok = False
+def pruefe_regeln(aktuelle_mengen):
+    """
+    检查当前的分类组合是否符合规则。
+    逻辑：只要有一种规则能容纳当前所有分类的数量，就返回 True。
+    """
+    if not aktuelle_mengen:
+        return True
+    for regel in PALETTEN_REGELN:
+        passt = True
+        for kat, menge in aktuelle_mengen.items():
+            if menge > regel.get(kat, 0):
+                passt = False
                 break
-        if is_rule_ok: return True
+        if passt:
+            return True
     return False
 
-# === 3. Session State ===
-if "pallet_number" not in st.session_state: st.session_state["pallet_number"] = 1
-if "pallet_items" not in st.session_state: st.session_state["pallet_items"] = {}
-if "pallet_history" not in st.session_state: st.session_state["pallet_history"] = []
+# === 4. Session State (状态管理) ===
+if "palette_nr" not in st.session_state: st.session_state["palette_nr"] = 1
+if "waren_auf_palette" not in st.session_state: st.session_state["waren_auf_palette"] = {}
+if "verlauf" not in st.session_state: st.session_state["verlauf"] = []
 
-# === 4. UI Header (Logo + Titel kombiniert) ===
-import base64
-
+# === 5. Header (Logo 与标题水平对齐) ===
 def get_base64(bin_file):
     with open(bin_file, 'rb') as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+        return base64.b64encode(f.read()).decode()
 
-# Logo laden und in Base64 konvertieren (um es direkt im HTML zu nutzen)
 try:
     logo_base64 = get_base64("Logo 2.png")
     logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="250">'
 except:
-    logo_html = '<div style="font-size:30px; font-weight:bold;">[LOGO]</div>'
+    logo_html = '<div style="font-size:24px; font-weight:bold;">[LOGO]</div>'
 
-# Der kombinierte Flexbox-Header
-st.markdown(
-    f"""
+st.markdown(f"""
     <div style="display: flex; align-items: center; gap: 30px; margin-bottom: 20px;">
-        <div>
-            {logo_html}
-        </div>
+        <div>{logo_html}</div>
         <div style="display: flex; flex-direction: column; justify-content: center;">
-            <h1 style="margin: 0; padding: 0; line-height: 1.2; font-size: 42px;">Paletten-Management</h1>
-            <p style="margin: 0; padding: 0; font-size: 20px; color: #666666;">Play with the number ones</p>
+            <h1 style="margin: 0; padding: 0; line-height: 1.1; font-size: 40px;">Paletten-Management</h1>
+            <p style="margin: 0; padding: 0; font-size: 18px; color: #666666;">Play with the number ones</p>
         </div>
     </div>
-    """,
-    unsafe_allow_html=True
-)
-
+""", unsafe_allow_html=True)
 st.divider()
 
-# Aktuelle Logik
-current_counts = Counter()
-for p, q in st.session_state["pallet_items"].items():
-    current_counts[product_to_category[p]] += q
+# === 6. Haupt-UI (主界面) ===
+# 计算当前已有的分类数量
+aktuelle_counts = Counter()
+for p, q in st.session_state["waren_auf_palette"].items():
+    aktuelle_counts[produkt_zu_kategorie[p]] += q
 
-allowed_products = [p for p in ALL_PRODUCTS if check_rules({**current_counts, product_to_category[p]: current_counts[product_to_category[p]] + 1})]
+# 找出至少还能再加 1 个的所有产品
+moegliche_produkte = [
+    p for p in ALLE_PRODUKTE 
+    if pruefe_regeln({**aktuelle_counts, produkt_zu_kategorie[p]: aktuelle_counts[produkt_zu_kategorie[p]] + 1})
+]
 
-# === 5. Haupt-Layout ===
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"📍 Aktuelle Palette #{st.session_state['pallet_number']}")
+    st.subheader(f"📍 Aktuelle Palette #{st.session_state['palette_nr']}")
     
     with st.container():
-        if not allowed_products:
-            st.success("Diese Palette ist optimal ausgelastet.")
-            # Falls die Palette voll ist, definieren wir Variablen als Platzhalter
-            selected_sku = None
-            is_qty_allowed = False
+        if not moegliche_produkte:
+            st.success("Die Palette ist voll ausgelastet.")
+            gewaehlte_sku = None
         else:
-            selected_sku = st.selectbox(
+            gewaehlte_sku = st.selectbox(
                 "Produkt wählen", 
-                options=allowed_products, 
-                format_func=lambda x: f"{x} – {product_to_name.get(x, '')}"
+                options=moegliche_produkte, 
+                format_func=lambda x: f"{x} – {produkt_zu_name.get(x, '')}"
             )
-            qty = st.number_input("Menge", min_value=1, max_value=50, step=1)
+            menge = st.number_input("Menge", min_value=1, max_value=50, value=1, step=1)
             
-            # --- SICHERHEITS-CHECK GEGEN KEYERROR ---
-            if selected_sku:
-                test_counts = current_counts.copy()
-                # Wir holen die Kategorie sicher ab
-                cat = product_to_category.get(selected_sku)
-                test_counts[cat] += qty
-                is_qty_allowed = check_rules(test_counts)
+            # --- 核心修复：根据当前输入的 Menge 进行校验 ---
+            if gewaehlte_sku:
+                test_counts = aktuelle_counts.copy()
+                kategorie = produkt_zu_kategorie.get(gewaehlte_sku)
+                test_counts[kategorie] += menge
+                menge_erlaubt = pruefe_regeln(test_counts)
             else:
-                is_qty_allowed = False
-            # ----------------------------------------
+                menge_erlaubt = False
 
-            if not is_qty_allowed and selected_sku:
-                st.error(f"❌ {qty} Einheiten passen nicht mehr auf die Palette!")
-        
-        st.write("") # Abstand
+            if not menge_erlaubt and gewaehlte_sku:
+                st.error(f"❌ {menge} Einheiten überschreiten das Limit!")
 
-        # --- Button Reihe ---
+        st.write("") # 间距
+
+        # --- 按钮行：对齐 Hinzufügen, Speichern, Leeren ---
         btn_col1, btn_col2, btn_col3 = st.columns(3)
         
         with btn_col1:
-            # Button nur aktiv, wenn ein Produkt gewählt UND die Menge erlaubt ist
-            can_add = selected_sku is not None and is_qty_allowed
-            if st.button("➕ Hinzufügen", type="primary", use_container_width=True, disabled=not can_add):
-                st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
+            # 只有当数量合法时才允许点击
+            add_aktiv = gewaehlte_sku is not None and menge_erlaubt
+            if st.button("➕ Hinzufügen", type="primary", use_container_width=True, disabled=not add_aktiv):
+                st.session_state["waren_auf_palette"][gewaehlte_sku] = st.session_state["waren_auf_palette"].get(gewaehlte_sku, 0) + menge
                 st.rerun()
         
         with btn_col2:
-            # Speichern nur aktiv, wenn die Palette nicht leer ist
-            has_items = len(st.session_state["pallet_items"]) > 0
-            if st.button("💾 Speichern", use_container_width=True, disabled=not has_items):
-                total_price = sum(product_to_price[p] * q for p, q in st.session_state["pallet_items"].items())
-                st.session_state["pallet_history"].append({
-                    "id": st.session_state["pallet_number"], 
-                    "items": st.session_state["pallet_items"].copy(), 
-                    "total": total_price
+            palette_hat_inhalt = len(st.session_state["waren_auf_palette"]) > 0
+            if st.button("💾 Speichern", use_container_width=True, disabled=not palette_hat_inhalt):
+                gesamt_preis = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+                st.session_state["verlauf"].append({
+                    "id": st.session_state["palette_nr"], 
+                    "items": st.session_state["waren_auf_palette"].copy(), 
+                    "total": gesamt_preis
                 })
-                st.session_state["pallet_items"], st.session_state["pallet_number"] = {}, st.session_state["pallet_number"] + 1
+                st.session_state["waren_auf_palette"] = {}
+                st.session_state["palette_nr"] += 1
                 st.rerun()
 
         with btn_col3:
             if st.button("🗑️ Leeren", use_container_width=True):
-                st.session_state["pallet_items"] = {}
+                st.session_state["waren_auf_palette"] = {}
                 st.rerun()
 
+with col2:
+    st.subheader("📝 Ladungsübersicht")
+    if st.session_state["waren_auf_palette"]:
+        tabelle_daten = []
+        for p, q in st.session_state["waren_auf_palette"].items():
+            tabelle_daten.append({
+                "SKU": p,
+                "Name": produkt_zu_name.get(p, ""),
+                "Menge": q,
+                "Gesamt": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"
+            })
+        st.table(pd.DataFrame(tabelle_daten))
+        total_summe = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+        st.markdown(f"### **Gesamtwert: {total_summe:,.2f} €**")
+    else:
+        st.info("Die Palette ist leer.")
 
-
-# Historie
+# === 7. Historie ===
 st.divider()
 st.subheader("📋 Historie abgeschlossener Paletten")
-
-if not st.session_state["pallet_history"]:
-    st.info("Noch keine Paletten in der Historie gespeichert.")
+if not st.session_state["verlauf"]:
+    st.write("Keine Einträge vorhanden.")
 else:
-    # Wir gehen die Historie von neu nach alt durch
-    for pallet in reversed(st.session_state["pallet_history"]):
-        # Jede Palette bekommt einen eigenen Container (weiße Karte mit Rahmen)
+    for eintrag in reversed(st.session_state["verlauf"]):
         with st.container(border=True):
-            # Header der Karte: Nummer und Gesamtpreis
-            h_col1, h_col2 = st.columns([1, 1])
-            with h_col1:
-                st.markdown(f"#### 📦 Palette #{pallet['id']}")
-            with h_col2:
-                st.markdown(f"<h4 style='text-align: right; color: #1a4a73;'>{pallet['total']:,.2f} €</h4>", unsafe_allow_html=True)
+            h_col1, h_col2 = st.columns(2)
+            h_col1.markdown(f"#### 📦 Palette #{eintrag['id']}")
+            h_col2.markdown(f"<p style='text-align:right; font-weight:bold; color:#1a4a73;'>{eintrag['total']:,.2f} €</p>", unsafe_allow_html=True)
             
-            # Die Artikelliste als saubere Tabelle aufbereiten
-            hist_items = []
-            for sku, qty in pallet["items"].items():
-                hist_items.append({
-                    "Artikelnr.": sku,
-                    "Bezeichnung": product_to_name.get(sku, "Unbekannt"),
-                    "Menge": f"{qty} Stk.",
-                    "Einzelpreis": f"{product_to_price.get(sku, 0):,.2f} €"
-                })
-            
-            # Tabelle anzeigen ohne Index
-            st.dataframe(
-                pd.DataFrame(hist_items), 
-                use_container_width=True, 
-                hide_index=True
-            )
-            
-            # Kleiner Abstand zwischen den Paletten
-            st.write("")
+            liste = [{"Produkt": produkt_zu_name.get(sku), "Menge": f"{q} Stk."} for sku, q in eintrag["items"].items()]
+            st.dataframe(pd.DataFrame(liste), use_container_width=True, hide_index=True)
