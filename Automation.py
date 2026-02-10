@@ -98,9 +98,9 @@ with col_logo:
         st.write("### [LOGO]")
 
 with col_title:
-    # Der Titel bleibt erhalten und ist vertikal etwas versetzt für die Optik
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.title("Play with the number ones")
+    # Haupttitel groß, Untertitel als Markdown darunter
+    st.title("Paletten-Management")
+    st.markdown("<p style='font-size: 20px; color: #666666; margin-top: -15px;'>Play with the number ones</p>", unsafe_allow_html=True)
 
 st.divider()
 
