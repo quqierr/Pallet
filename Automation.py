@@ -100,7 +100,7 @@ def get_base64(bin_file):
 # Logo laden und in Base64 konvertieren (um es direkt im HTML zu nutzen)
 try:
     logo_base64 = get_base64("Logo 2.png")
-    logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="200">'
+    logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="300">'
 except:
     logo_html = '<div style="font-size:30px; font-weight:bold;">[LOGO]</div>'
 
