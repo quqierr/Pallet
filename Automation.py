@@ -89,7 +89,7 @@ def get_base64(bin_file):
     with open(bin_file, 'rb') as f: return base64.b64encode(f.read()).decode()
 
 try:
-    logo_html = f'<img src="data:image/png;base64,{get_base64("Logo 2.png")}" width="230">'
+    logo_html = f'<img src="data:image/png;base64,{get_base64("Logo 2.png")}" width="270">'
 except:
     logo_html = '<div style="font-size:24px; font-weight:bold;">[LOGO]</div>'
 
