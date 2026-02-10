@@ -142,13 +142,18 @@ with col1:
             selected_sku = st.selectbox("Produkt wählen", options=allowed_products, format_func=lambda x: f"{x} – {product_to_name.get(x, '')}")
             qty = st.number_input("Menge", min_value=1, max_value=24, step=1)
             
-            if st.button("Zum Auftrag hinzufügen", type="primary"):
-                st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
-                st.rerun()
-
-    if st.button("Palette leeren"):
-        st.session_state["pallet_items"] = {}
-        st.rerun()
+            # --- Hier ist die Änderung: Buttons in einer Zeile ---
+            btn_col1, btn_col2 = st.columns(2)
+            
+            with btn_col1:
+                if st.button("Hinzufügen", type="primary", use_container_width=True):
+                    st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
+                    st.rerun()
+            
+            with btn_col2:
+                if st.button("Leeren", use_container_width=True):
+                    st.session_state["pallet_items"] = {}
+                    st.rerun()
 
 with col2:
     st.subheader("Ladungsübersicht")
