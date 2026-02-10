@@ -133,48 +133,48 @@ allowed_products = [p for p in ALL_PRODUCTS if check_rules({**current_counts, pr
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
-    st.subheader(f"Aktuelle Palette #{st.session_state['pallet_number']}")
+    st.subheader(f"📍 Aktuelle Palette #{st.session_state['pallet_number']}")
     
     with st.container():
         if not allowed_products:
             st.success("Diese Palette ist optimal ausgelastet.")
         else:
-            selected_sku = st.selectbox("Produkt wählen", options=allowed_products, format_func=lambda x: f"{x} – {product_to_name.get(x, '')}")
+            selected_sku = st.selectbox(
+                "Produkt wählen", 
+                options=allowed_products, 
+                format_func=lambda x: f"{x} – {product_to_name.get(x, '')}"
+            )
             qty = st.number_input("Menge", min_value=1, max_value=24, step=1)
             
-            # --- Hier ist die Änderung: Buttons in einer Zeile ---
-            btn_col1, btn_col2 = st.columns(2)
+            st.write("") # Kleiner Abstandshalter
+
+            # --- Alle drei Buttons in einer Reihe ---
+            btn_col1, btn_col2, btn_col3 = st.columns(3)
             
             with btn_col1:
-                if st.button("Hinzufügen", type="primary", use_container_width=True):
+                # Primäre Aktion: Hinzufügen
+                if st.button("➕ Hinzufügen", type="primary", use_container_width=True):
                     st.session_state["pallet_items"][selected_sku] = st.session_state["pallet_items"].get(selected_sku, 0) + qty
                     st.rerun()
             
             with btn_col2:
-                if st.button("Leeren", use_container_width=True):
-                    st.session_state["pallet_items"] = {}
+                # Sekundäre Aktion: Abschließen/Speichern
+                # Wir aktivieren den Button nur, wenn auch etwas auf der Palette liegt
+                if st.button("💾 Speichern", use_container_width=True, disabled=not st.session_state["pallet_items"]):
+                    total_price = sum(product_to_price[p] * q for p, q in st.session_state["pallet_items"].items())
+                    st.session_state["pallet_history"].append({
+                        "id": st.session_state["pallet_number"], 
+                        "items": st.session_state["pallet_items"].copy(), 
+                        "total": total_price
+                    })
+                    st.session_state["pallet_items"], st.session_state["pallet_number"] = {}, st.session_state["pallet_number"] + 1
                     st.rerun()
 
-with col2:
-    st.subheader("Ladungsübersicht")
-    if st.session_state["pallet_items"]:
-        table_data = [{"SKU": p, "Name": product_to_name[p], "Menge": q, "Einzelpreis": f"{product_to_price[p]:,.2f} €", "Summe": f"{product_to_price[p]*q:,.2f} €"} 
-                      for p, q in st.session_state["pallet_items"].items()]
-        st.table(pd.DataFrame(table_data))
-        
-        total_price = sum(product_to_price[p] * q for p, q in st.session_state["pallet_items"].items())
-        st.markdown(f"### **Gesamtwert: {total_price:,.2f} €**")
-        
-        if st.button("Palette abschließen & Speichern", type="primary"):
-            st.session_state["pallet_history"].append({
-                "id": st.session_state["pallet_number"], 
-                "items": st.session_state["pallet_items"].copy(), 
-                "total": total_price
-            })
-            st.session_state["pallet_items"], st.session_state["pallet_number"] = {}, st.session_state["pallet_number"] + 1
-            st.rerun()
-    else:
-        st.info("Die Palette ist aktuell leer.")
+            with btn_col3:
+                # Destruktive Aktion: Leeren
+                if st.button("🗑️ Leeren", use_container_width=True):
+                    st.session_state["pallet_items"] = {}
+                    st.rerun()
 
 # Historie
 st.divider()
