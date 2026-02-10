@@ -2,57 +2,54 @@ import streamlit as st
 import pandas as pd
 from collections import Counter
 
-# === 1. Konfiguration & Layout ===
-st.set_page_config(page_title="Pallet Assistant", page_icon="📦", layout="wide")
+# === 1. Grundeinstellungen & Design ===
+st.set_page_config(
+    page_title="Palettierung",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-col1, col2 = st.columns([1, 6])
-with col1:
-    # Falls das Bild nicht existiert, fangen wir den Fehler ab, damit die App nicht crasht
-    try:
-        st.image("Logo.png", width=150)
-    except:
-        st.write("📦") # Platzhalter
-with col2:
-    st.markdown(
-        """
-        <div style="display: flex; align-items: center; height: 70px;">
-            <h2 style="margin: 0;">Play with the number ones</h2>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+# Kleines CSS für professionelleren Look (Tabellen und Abstände)
+st.markdown("""
+    <style>
+    .block-container {padding-top: 2rem; padding-bottom: 2rem;}
+    div[data-testid="stMetricValue"] {font-size: 1.8rem;}
+    </style>
+""", unsafe_allow_html=True)
 
-st.divider()
-st.title("📦 Paletten-Assistent")
-
-# === 2. Daten laden ===
+# === 2. Daten & Logik ===
 EXCEL_PATH = "Expert Automation.xlsx"
 
 @st.cache_data
 def load_data(file_path):
-    # Fallback für Demo-Zwecke, falls Datei fehlt (für Copy-Paste User hilfreich)
     try:
         models = pd.read_excel(file_path, sheet_name="Models")
     except FileNotFoundError:
-        st.error(f"Datei '{file_path}' nicht gefunden. Bitte Pfad prüfen.")
-        return {}, {}, {}, {}, []
+        # Dummy-Daten für Demo, falls Datei fehlt
+        data = {
+            "Product code": ["P1", "P2", "P3", "P4"],
+            "Category code": ["A", "B", "K6", "S"],
+            "Product name": ["Produkt Alpha", "Produkt Beta", "Karton 6er", "Spezial"],
+            "Product price": [100, 50, 20, 200],
+            "Sub-Categories": ["Cat A", "Cat B", "Karton", "Special"]
+        }
+        models = pd.DataFrame(data)
 
     p_to_cat = dict(zip(models["Product code"], models["Category code"]))
     p_to_name = dict(zip(models["Product code"], models["Product name"]))
     p_to_price = dict(zip(models["Product code"], models["Product price"]))
-    p_to_cat_fullname = dict(zip(models["Product code"], models["Sub-Categories"]))
     all_prods = list(p_to_cat.keys())
-    
-    return p_to_cat, p_to_name, p_to_price, p_to_cat_fullname, all_prods
+    return p_to_cat, p_to_name, p_to_price, all_prods
 
-# Daten initialisieren
+# Daten laden
 try:
-    product_to_category, product_to_name, product_to_price, product_to_cat_fullname, ALL_PRODUCTS = load_data(EXCEL_PATH)
-except Exception as e:
-    st.error(f"Fehler beim Laden der Daten: {e}")
+    product_to_category, product_to_name, product_to_price, ALL_PRODUCTS = load_data(EXCEL_PATH)
+except Exception:
+    st.error("Fehler: Datenbank konnte nicht geladen werden.")
     st.stop()
 
-# === 3. Regelwerk ===
+# Regelwerk
 PALLET_RULES = [
     {"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24},
     {"K8": 6}, {"S": 4}, {"A": 4}, {"T4": 4}, {"T2": 2},
@@ -68,11 +65,10 @@ PALLET_RULES = [
 ]
 
 def check_rules(cat_counts):
-    """Prüft, ob die aktuelle Beladung EINER der Regeln entspricht (also 'in Ordnung' ist)."""
+    """Prüft, ob die Kombination erlaubt ist."""
     for rule in PALLET_RULES:
         is_rule_ok = True
         for cat, qty in cat_counts.items():
-            # Wenn wir mehr haben als die Regel erlaubt, passt diese Regel nicht
             if rule.get(cat, 0) < qty:
                 is_rule_ok = False
                 break
@@ -80,167 +76,160 @@ def check_rules(cat_counts):
             return True
     return False
 
-# === 4. Session State ===
+def get_valid_products_for_next_step(current_items):
+    """
+    Ermittelt, welche Produkte noch hinzugefügt werden dürfen (mindestens 1 Stück).
+    """
+    current_counts = Counter()
+    for p, q in current_items.items():
+        current_counts[product_to_category.get(p)] += q
+    
+    valid_products = []
+    for p in ALL_PRODUCTS:
+        test_counts = current_counts.copy()
+        cat = product_to_category.get(p)
+        test_counts[cat] += 1
+        
+        if check_rules(test_counts):
+            valid_products.append(p)
+            
+    return valid_products, current_counts
+
+# === 3. Session State ===
 if "pallet_number" not in st.session_state:
     st.session_state["pallet_number"] = 1
 if "pallet_items" not in st.session_state:
-    st.session_state["pallet_items"] = {}  # {sku: qty}
+    st.session_state["pallet_items"] = {} 
 if "pallet_history" not in st.session_state:
-    st.session_state["pallet_history"] = [] # Liste von Dicts: [{"items": {...}, "total": 123.45}]
+    st.session_state["pallet_history"] = []
 
-# === 5. UI: Produkte hinzufügen ===
-st.subheader(f"1️⃣ Produkte hinzufügen (Palette #{st.session_state['pallet_number']})")
+# === 4. UI Aufbau ===
 
-with st.form("add_product_form", clear_on_submit=True):
-    col_input1, col_input2, col_btn = st.columns([3, 1, 1])
+# --- Header ---
+col_logo, col_title = st.columns([1, 8])
+with col_logo:
+    try:
+        st.image("Logo.png", width=100)
+    except:
+        st.write("📦")
+with col_title:
+    st.title("Paletten-Assistent")
+    st.markdown("**Interaktive Beladungsplanung**")
+
+st.divider()
+
+# --- Hauptbereich ---
+# Wir berechnen VOR dem Rendern, was erlaubt ist
+allowed_products, current_cat_counts = get_valid_products_for_next_step(st.session_state["pallet_items"])
+is_full = len(allowed_products) == 0 and len(st.session_state["pallet_items"]) > 0
+
+# Grid Layout
+left_panel, right_panel = st.columns([1, 1], gap="large")
+
+# --- LINKE SPALTE: Eingabe ---
+with left_panel:
+    st.subheader(f"1. Auftrag erfassen (Palette #{st.session_state['pallet_number']})")
     
-    with col_input1:
-        selected_sku = st.selectbox(
-            "Produkt", 
-            options=ALL_PRODUCTS, 
-            format_func=lambda x: f"{x} – {product_to_name.get(x, 'Unknown')}"
-        )
-    
-    with col_input2:
-        qty_input = st.number_input("Menge", min_value=1, max_value=50, step=1, value=1)
-        
-    with col_btn:
-        st.write("") # Spacer
-        st.write("") # Spacer
-        add_submitted = st.form_submit_button("➕ Hinzufügen")
-
-    if add_submitted:
-        # Logik: Wenn Produkt schon da, Menge addieren, sonst neu anlegen
-        if selected_sku in st.session_state["pallet_items"]:
-            st.session_state["pallet_items"][selected_sku] += qty_input
+    with st.container(border=True):
+        if is_full:
+            st.success("✅ Palette ist optimal gefüllt. Keine weiteren Produkte möglich.")
+            st.caption("Bitte Palette abschließen, um fortzufahren.")
         else:
-            st.session_state["pallet_items"][selected_sku] = qty_input
-        st.rerun()
+            with st.form("add_form", clear_on_submit=True):
+                # Nur erlaubte Produkte anzeigen
+                sel_prod = st.selectbox(
+                    "Verfügbares Produkt wählen", 
+                    options=allowed_products,
+                    format_func=lambda x: f"{x} – {product_to_name.get(x, '')}",
+                    help="Es werden nur Produkte angezeigt, die noch auf die Palette passen."
+                )
+                
+                # Mengenauswahl (könnte man noch dynamischer begrenzen, hier einfach 1-10)
+                sel_qty = st.number_input("Anzahl Gebinde", min_value=1, max_value=10, step=1)
+                
+                if st.form_submit_button("⬇️ Zur Palette hinzufügen", use_container_width=True, type="primary"):
+                    # Double Check Logic
+                    test_counts = current_cat_counts.copy()
+                    cat = product_to_category.get(sel_prod)
+                    test_counts[cat] += sel_qty
+                    
+                    if check_rules(test_counts):
+                        st.session_state["pallet_items"][sel_prod] = st.session_state["pallet_items"].get(sel_prod, 0) + sel_qty
+                        st.rerun()
+                    else:
+                        st.toast("⚠️ Menge zu hoch! Das passt nicht mehr drauf.", icon="❌")
 
-# === 6. UI: Aktuelle Palette prüfen ===
-st.divider()
-col_left, col_right = st.columns([1, 1])
-
-with col_left:
-    st.subheader("2️⃣ Inhalt der aktuellen Palette")
+# --- RECHTE SPALTE: Aktueller Status ---
+with right_panel:
+    st.subheader("2. Aktueller Paletteninhalt")
     
-    if not st.session_state["pallet_items"]:
-        st.info("Die Palette ist noch leer.")
-        current_total_price = 0.0
-        current_counts = Counter()
-        is_current_valid = True # Leere Palette ist technisch gesehen "gültig" oder neutral
-        can_add_more = True
-    else:
-        # Berechnung
-        current_counts = Counter()
-        current_total_price = 0.0
-        
-        # Liste anzeigen
+    # Live Berechnung Preis
+    current_total = sum(product_to_price.get(p, 0) * q for p, q in st.session_state["pallet_items"].items())
+    item_count = sum(st.session_state["pallet_items"].values())
+
+    # KPI Row
+    kpi1, kpi2 = st.columns(2)
+    kpi1.metric("Gesamtwert", f"{current_total:.2f} €")
+    kpi2.metric("Gebinde", f"{item_count} Stk")
+
+    # Tabelle statt Liste
+    if st.session_state["pallet_items"]:
+        df_items = []
         for p, q in st.session_state["pallet_items"].items():
-            line_price = product_to_price.get(p, 0) * q
-            current_total_price += line_price
-            
-            # Kategorie zählen
-            cat = product_to_category.get(p, "Unknown")
-            current_counts[cat] += q
-            
-            st.write(f"▪️ **{q}x** {product_to_name.get(p, p)} ({p}) — {line_price:.2f} €")
-
-        st.markdown(f"#### **Summe: {current_total_price:.2f} €**")
+            single_price = product_to_price.get(p, 0)
+            df_items.append({
+                "SKU": p,
+                "Produkt": product_to_name.get(p, ""),
+                "Menge": q,
+                "Preis": f"{single_price * q:.2f} €"
+            })
         
-        # Validierung
-        is_current_valid = check_rules(current_counts)
+        st.dataframe(
+            pd.DataFrame(df_items), 
+            hide_index=True, 
+            use_container_width=True,
+            column_config={
+                "Menge": st.column_config.NumberColumn("Menge", format="%d")
+            }
+        )
         
-        # Prüfen ob noch Platz ist
-        can_add_more = False
-        for p in ALL_PRODUCTS:
-            test_counts = current_counts.copy()
-            cat = product_to_category.get(p)
-            if cat:
-                test_counts[cat] += 1
-                if check_rules(test_counts):
-                    can_add_more = True
-                    break
-
-with col_right:
-    st.subheader("Status")
-    
-    if not st.session_state["pallet_items"]:
-        st.write("⚪ Warte auf Produkte...")
-    elif not is_current_valid:
-        st.error("❌ Palette ist überladen/ungültig")
-        st.caption("Die aktuelle Kombination passt in keine der definierten Regeln.")
-    elif is_current_valid and not can_add_more:
-        st.success("✅ Palette ist voll")
-        st.caption("Maximale Kapazität erreicht.")
+        # Aktionen
+        col_btn1, col_btn2 = st.columns(2)
+        if col_btn1.button("🗑️ Leeren", use_container_width=True):
+            st.session_state["pallet_items"] = {}
+            st.rerun()
+            
+        if col_btn2.button("💾 Palette abschließen", type="primary", use_container_width=True):
+            # Speichern
+            st.session_state["pallet_history"].append({
+                "id": st.session_state["pallet_number"],
+                "items": st.session_state["pallet_items"].copy(),
+                "total": current_total,
+                "timestamp": pd.Timestamp.now().strftime("%H:%M")
+            })
+            st.toast(f"Palette #{st.session_state['pallet_number']} gespeichert!", icon="✅")
+            st.session_state["pallet_number"] += 1
+            st.session_state["pallet_items"] = {}
+            st.rerun()
+            
     else:
-        st.info("✅ Palette ist gültig (Platz vorhanden)")
-        # Vorschläge berechnen
-        allowed_cats = set()
-        for p in ALL_PRODUCTS:
-            test_counts = current_counts.copy()
-            cat = product_to_category.get(p)
-            if cat:
-                test_counts[cat] += 1
-                if check_rules(test_counts):
-                    allowed_cats.add(product_to_cat_fullname.get(p, cat))
-        
-        if allowed_cats:
-            with st.expander("Was passt noch dazu?"):
-                st.write(", ".join(sorted(allowed_cats)))
+        st.info("Noch keine Produkte geladen.")
 
-# === 7. UI: Aktionen (Speichern / Reset) ===
-st.divider()
-col_actions1, col_actions2 = st.columns(2)
 
-with col_actions1:
-    if st.button("🗑️ Aktuelle Palette leeren (Reset)"):
-        st.session_state["pallet_items"] = {}
-        st.rerun()
-
-with col_actions2:
-    # Button nur aktiv, wenn Items drauf sind und Palette gültig ist (optional)
-    if st.button("💾 Palette abschließen & Neue beginnen", type="primary", disabled=not st.session_state["pallet_items"]):
-        if not is_current_valid:
-            st.warning("Achtung: Du speicherst eine ungültige Palette!")
-        
-        # 1. Speichern
-        pallet_record = {
-            "id": st.session_state["pallet_number"],
-            "items": st.session_state["pallet_items"].copy(),
-            "total_price": current_total_price
-        }
-        st.session_state["pallet_history"].append(pallet_record)
-        
-        # 2. Reset & Hochzählen
-        st.session_state["pallet_items"] = {}
-        st.session_state["pallet_number"] += 1
-        
-        st.success("Palette gespeichert!")
-        st.rerun()
-
-# === 8. Historie ===
-st.markdown("---")
-st.subheader("📋 Gespeicherte Paletten")
-
-if not st.session_state["pallet_history"]:
-    st.caption("Noch keine Paletten abgeschlossen.")
-else:
-    grand_total = 0.0
+# === 5. SIDEBAR: Historie ===
+with st.sidebar:
+    st.header("📋 Verlauf")
     
-    # Rückwärts iterieren, damit die neueste oben steht
-    for record in reversed(st.session_state["pallet_history"]):
-        p_id = record["id"]
-        p_items = record["items"]
-        p_total = record["total_price"]
-        grand_total += p_total
+    if not st.session_state["pallet_history"]:
+        st.caption("Noch keine Paletten fertiggestellt.")
+    else:
+        grand_total = sum(h["total"] for h in st.session_state["pallet_history"])
+        st.metric("Gesamtumsatz (Session)", f"{grand_total:.2f} €")
+        st.divider()
         
-        with st.expander(f"📦 Palette #{p_id} (Summe: {p_total:.2f} €)"):
-            for sku, q in p_items.items():
-                name = product_to_name.get(sku, "Unknown")
-                price_single = product_to_price.get(sku, 0)
-                st.write(f"- {q}x {name} ({sku}) à {price_single:.2f} €")
-            
-            st.write(f"**Total: {p_total:.2f} €**")
-
-    st.markdown(f"### Gesamtwert aller Aufträge: {grand_total:.2f} €")
+        # Rückwärts sortieren (neueste zuerst)
+        for entry in reversed(st.session_state["pallet_history"]):
+            with st.expander(f"Palette #{entry['id']} ({entry['timestamp']})"):
+                st.write(f"**Summe: {entry['total']:.2f} €**")
+                for p, q in entry["items"].items():
+                    st.write(f"- {q}x {p}")
