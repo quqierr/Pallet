@@ -179,9 +179,37 @@ with col2:
 # Historie
 st.divider()
 st.subheader("📋 Historie abgeschlossener Paletten")
+
 if not st.session_state["pallet_history"]:
-    st.caption("Noch keine Paletten gespeichert.")
+    st.info("Noch keine Paletten in der Historie gespeichert.")
 else:
+    # Wir gehen die Historie von neu nach alt durch
     for pallet in reversed(st.session_state["pallet_history"]):
-        with st.expander(f"Palette #{pallet['id']} — Gesamtwert: {pallet['total']:,.2f} €"):
-            st.write(pallet["items"])
+        # Jede Palette bekommt einen eigenen Container (weiße Karte mit Rahmen)
+        with st.container(border=True):
+            # Header der Karte: Nummer und Gesamtpreis
+            h_col1, h_col2 = st.columns([1, 1])
+            with h_col1:
+                st.markdown(f"#### 📦 Palette #{pallet['id']}")
+            with h_col2:
+                st.markdown(f"<h4 style='text-align: right; color: #1a4a73;'>{pallet['total']:,.2f} €</h4>", unsafe_allow_html=True)
+            
+            # Die Artikelliste als saubere Tabelle aufbereiten
+            hist_items = []
+            for sku, qty in pallet["items"].items():
+                hist_items.append({
+                    "Artikelnr.": sku,
+                    "Bezeichnung": product_to_name.get(sku, "Unbekannt"),
+                    "Menge": f"{qty} Stk.",
+                    "Einzelpreis": f"{product_to_price.get(sku, 0):,.2f} €"
+                })
+            
+            # Tabelle anzeigen ohne Index
+            st.dataframe(
+                pd.DataFrame(hist_items), 
+                use_container_width=True, 
+                hide_index=True
+            )
+            
+            # Kleiner Abstand zwischen den Paletten
+            st.write("")
