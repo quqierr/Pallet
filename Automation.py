@@ -232,6 +232,6 @@ gesamt_aller_paletten = sum(e["total"] for e in st.session_state["verlauf"])
 st.markdown(f"""
     <div style="text-align: right; padding: 20px; border-top: 3px double #EEEEEE; background-color: #F9F9F9; border-radius: 8px;">
         <span style="font-size: 18px; color: #333333;">GESAMTSUMME ALLER PALETTEN:</span><br>
-        <span style="font-size: 32px; font-weight: bold; color: #d9534f;">{gesamt_aller_paletten:,.2f} €</span>
+        <span style="font-size: 32px; font-weight: bold; color: #0C5CA8;">{gesamt_aller_paletten:,.2f} €</span>
     </div>
 """, unsafe_allow_html=True)
