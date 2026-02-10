@@ -148,13 +148,22 @@ for p in ALL_PRODUCTS:
         can_add_more = True
         break
 
-# 价格
+# Price
 total_price = sum(
     product_to_price[p] * qty
     for p, qty in st.session_state["pallet_items"].items()
 )
 
 st.write(f"💰 **Gesamtpreis der Palette: € {total_price:.2f}**")
+
+def get_allowed_categories_from_counts(current_counts):
+    allowed_cats = set()
+    for p in ALL_PRODUCTS:
+        test_counts = current_counts.copy()
+        test_counts[product_to_category[p]] += 1
+        if check_rules(test_counts):
+            allowed_cats.add(product_to_cat_fullname[p])
+    return sorted(allowed_cats)
 
 st.subheader("Status")
 
@@ -174,20 +183,11 @@ elif is_current_valid and not can_add_more:
 else:
     st.info("✅ Palette kann weiter beladen werden")
     
-    with st.expander("Show available additions details"):
-        
-        available_names = sorted(list(set(product_to_cat_fullname[p] for p in allowed_additions)))
-        
-        st.write(f"**Available Categories to add:**")
-        st.write(", ".join(available_names))
-        
-        st.write("---")
-        st.write("**Specific products (Sample):**")
-        
-        for p in allowed_additions[:60]:
-            cat_fullname = product_to_cat_fullname[p]
-            p_name = product_to_name[p]
-            st.write(f"- {p} ({p_name}) [Category: {cat_fullname}]")
+    allowed_categories = get_allowed_categories_from_counts(current_counts)
+
+if allowed_categories:
+    with st.expander("Mögliche zusätzliche Kategorien"):
+        st.write(", ".join(allowed_categories))
             
 
             
