@@ -37,11 +37,24 @@ def lade_daten(datei_pfad):
     try:
         df = pd.read_excel(datei_pfad, sheet_name="Models")
         
-        # === FIX: Preise in Zahlen umwandeln ===
-        # Erzwingt die Umwandlung in Zahlen. Fehlerhafte Werte werden zu NaN, dann zu 0.0
-        df["Product price"] = pd.to_numeric(df["Product price"], errors='coerce').fillna(0.0)
+        # --- 数据清洗开始 ---
+        # 1. 先把这一列转成字符串，方便处理
+        df["Product price"] = df["Product price"].astype(str)
         
-    except Exception:
+        # 2. 去掉欧元符号、多余空格和千分位点（如果有的话）
+        df["Product price"] = df["Product price"].str.replace('€', '', regex=False).str.strip()
+        
+        # 3. 关键：把德式/中式数值中的逗号 ',' 替换成 Python 认的数字点 '.'
+        # 比如把 "12,50" 变成 "12.50"
+        df["Product price"] = df["Product price"].str.replace(',', '.', regex=False)
+        
+        # 4. 现在再转换，成功率就极高了
+        df["Product price"] = pd.to_numeric(df["Product price"], errors='coerce').fillna(0.0)
+        # --- 数据清洗结束 ---
+        
+    except Exception as e:
+        # 如果找不到文件或出错，显示错误（调试用）
+        st.error(f"Excel读取失败: {e}")
         data = {
             "Product code": ["SKU-01", "SKU-02"],
             "Category code": ["A", "B"],
