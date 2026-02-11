@@ -30,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # === 2. Daten laden ===
-EXCEL_PFAD = "Expert Automation.xlsx"
+EXCEL_PFAD = "Expert Automation Final.xlsx"
 
 @st.cache_data
 def lade_daten(datei_pfad):
