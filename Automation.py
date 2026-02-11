@@ -36,6 +36,11 @@ EXCEL_PFAD = "Expert Automation Final.xlsx"
 def lade_daten(datei_pfad):
     try:
         df = pd.read_excel(datei_pfad, sheet_name="Models")
+        
+        # === FIX: Preise in Zahlen umwandeln ===
+        # Erzwingt die Umwandlung in Zahlen. Fehlerhafte Werte werden zu NaN, dann zu 0.0
+        df["Product price"] = pd.to_numeric(df["Product price"], errors='coerce').fillna(0.0)
+        
     except Exception:
         data = {
             "Product code": ["SKU-01", "SKU-02"],
