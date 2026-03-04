@@ -214,7 +214,7 @@ with col2:
         # ✅ 实时运费显示
         if len(st.session_state["waren_auf_palette"]) == 1:
             total_summe += 81
-            st.info("📦 Versandkosten: 81,00 € (Einzelprodukt-Palette)")
+            st.info("Versandkosten für Einzelprodukt-Palette: 81,00 €")
 
         st.markdown(f"""
         <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
