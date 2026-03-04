@@ -175,10 +175,10 @@ with col1:
             )
 
             # ✅ 运费逻辑
-          if len(st.session_state["waren_auf_palette"]) == 1:
-            sku = list(st.session_state["waren_auf_palette"].keys())[0]
-            if produkt_zu_kategorie.get(sku) != "K1":
-                preis += 81
+            if len(st.session_state["waren_auf_palette"]) == 1:
+                sku = list(st.session_state["waren_auf_palette"].keys())[0]
+                if produkt_zu_kategorie.get(sku) != "K1":
+                    preis += 81
 
             st.session_state["verlauf"].append({
                 "id": st.session_state["palette_nr"],
