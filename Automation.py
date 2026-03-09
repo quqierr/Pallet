@@ -37,10 +37,13 @@ def lade_daten(datei_pfad):
     try:
         df = pd.read_excel(datei_pfad, sheet_name="Models")
 
-        df["Product price"] = df["Product price"].astype(str)
-        df["Product price"] = df["Product price"].str.replace('€','')
-        df["Product price"] = df["Product price"].str.replace('.','')   # 去掉千位
-        df["Product price"] = df["Product price"].str.replace(',','.')
+        df["Product price"] = (
+            df["Product price"]
+            .astype(str)
+            .str.replace("€", "", regex=False)
+            .str.replace(r"(?<=\d)\.(?=\d{3}\b)", "", regex=True)  # 只删除千位点
+            .str.replace(",", ".", regex=False)
+        )
         df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
 
     except Exception as e:
