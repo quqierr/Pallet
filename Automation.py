@@ -30,31 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # === 2. Daten laden ===
-EXCEL_PFAD = "Expert Automation Final.xlsx"
-
-@st.cache_data
-def lade_daten(datei_pfad):
-    try:
-        df = pd.read_excel(datei_pfad, sheet_name="Models")
-
-        df["Product price"] = (
-            df["Product price"]
-            .astype(str)
-            .str.replace("€", "", regex=False)
-            .str.replace(r"(?<=\d)\.(?=\d{3}\b)", "", regex=True)  # 只删除千位点
-            .str.replace(",", ".", regex=False)
-        )
-        df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
-
-    except Exception as e:
-        st.error(f"Excel读取失败: {e}")
-        data = {
-            "Product code": ["SKU-01", "SKU-02"],
-            "Category code": ["A", "B"],
-            "Product name": ["Produkt A", "Produkt B"],
-            "Product price": [100.0, 200.0]
-        }
-        df = pd.DataFrame(data)
+EXCEL_PFAD = "Expert Automation Final v02.xlsx"
 
     p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
     p_zu_name = dict(zip(df["Product code"], df["Product name"]))
