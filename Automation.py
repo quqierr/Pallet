@@ -38,9 +38,10 @@ def lade_daten(datei_pfad):
         df = pd.read_excel(datei_pfad, sheet_name="Models")
 
         df["Product price"] = df["Product price"].astype(str)
-        df["Product price"] = df["Product price"].str.replace('€', '', regex=False).str.strip()
-        df["Product price"] = df["Product price"].str.replace(',', '.', regex=False)
-        df["Product price"] = pd.to_numeric(df["Product price"], errors='coerce').fillna(0.0)
+        df["Product price"] = df["Product price"].str.replace('€','')
+        df["Product price"] = df["Product price"].str.replace('.','')   # 去掉千位
+        df["Product price"] = df["Product price"].str.replace(',','.')
+        df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
 
     except Exception as e:
         st.error(f"Excel读取失败: {e}")
