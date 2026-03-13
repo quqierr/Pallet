@@ -18,9 +18,21 @@ st.markdown("""
         width: 100%;
         transition: all 0.2s;
     }
-    div.stButton > button:hover {
-        border-color: #000000 !important;
-        background-color: #F9F9F9 !important;
+    div.stButton > button {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 4px !important;
+        height: 3em;
+        width: 100% !important; /* 让它填满所在的列 */
+        transition: all 0.2s;
+
+        /* --- 核心修复：防止图片中那种情况 --- */
+        white-space: nowrap;      /* 🛑 DIESER PUNKT IST AM WICHTIGSTEN! Verhindert Textumbruch */
+        overflow: hidden;         /* Schneidet überschüssigen Text ab, falls er zu lang ist */
+        text-overflow: ellipsis;  /* Fügt "..." hinzu, wenn Text abgeschnitten wird */
+        padding-left: 10px;       /* Fügt etwas Padding hinzu, damit der Text nicht am Rand klebt */
+        padding-right: 10px;
     }
     div[data-testid="stBaseButton-primary"] {
         font-weight: bold !important;
@@ -153,7 +165,7 @@ with col1:
         else:
             menge_erlaubt = False
 
-    b_col1, b_col2, b_gap, b_col3 = st.columns([1, 1, 0.2, 1])
+    b_col1, b_col2, b_col3 = st.columns([1, 1, 1], gap="small")
 
     with b_col1:
         add_ok = gewaehlte_sku is not None and menge_erlaubt
