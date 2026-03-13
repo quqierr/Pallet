@@ -55,7 +55,7 @@ def lade_daten(datei_pfad):
 
     # 建立映射字典
     p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
-    p_zu_sub = dict(zip(df["Product code"], df["Sub-categories"])) # 新增：子类别映射
+    p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"])) # 新增：子类别映射
     p_zu_name = dict(zip(df["Product code"], df["Product name"]))
     p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
 
