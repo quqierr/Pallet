@@ -177,7 +177,9 @@ with col1:
             )
 
             # ✅ 运费逻辑
-            if len(st.session_state["waren_auf_palette"]) == 1:
+            total_anzahl = sum(st.session_state["waren_auf_palette"].values())
+            
+            if total_anzahl == 1:
                 sku = list(st.session_state["waren_auf_palette"].keys())[0]
                 if produkt_zu_kategorie.get(sku) != "K1":
                     preis += 81
@@ -216,11 +218,13 @@ with col2:
         )
 
         # ✅ 实时运费显示
-        if len(st.session_state["waren_auf_palette"]) == 1:
+        total_anzahl = sum(st.session_state["waren_auf_palette"].values())
+        
+        if total_anzahl == 1:
             sku = list(st.session_state["waren_auf_palette"].keys())[0]
             if produkt_zu_kategorie.get(sku) != "K1":
                 total_summe += 81
-                st.info("Versandkosten für Einzelprodukt-Palette: 81,00 €")
+                st.info("Versandkosten für Einzelstück-Lieferung: 81,00 €")
 
         st.markdown(f"""
         <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
