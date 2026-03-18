@@ -162,10 +162,10 @@ with col1:
             if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
                 st.error("❌ Produkt aktuell nicht verfügbar!")
             menge_erlaubt = False
-            else:
-                test_counts = aktuelle_counts.copy()
-                test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
-                menge_erlaubt = check_palette_valid(test_counts)
+        else:
+            test_counts = aktuelle_counts.copy()
+            test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
+            menge_erlaubt = check_palette_valid(test_counts)
             if not menge_erlaubt:
                 st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
 
