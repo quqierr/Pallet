@@ -38,7 +38,7 @@ st.markdown("""
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
 EXCEL_PFAD_STOCK = "https://candygroup.sharepoint.com/:x:/r/sites/DemandPlanningDEAT/Shared%20Documents/General/00%20Reporting/Stock%20Report/Lagerliste%20SAP_Master.XLSX?d=wa9620dd70ddd4843b88e940b79881b05&csf=1&web=1&e=sBwsTh"
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
         # === 主数据（原Excel）===
