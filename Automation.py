@@ -150,6 +150,7 @@ with col1:
     if not moegliche_produkte:
         st.success("✅ **Palette ist optimal ausgelastet!**")
         gewaehlte_sku = None
+        menge_erlaubt = False
     else:
         gewaehlte_sku = st.selectbox(
             "Produkt wählen",
@@ -158,16 +159,17 @@ with col1:
         )
         menge = st.number_input("Menge", min_value=1, max_value=50, value=1)
         
+        # 【修正的逻辑区域：正确验证数量是否被允许】
+        menge_erlaubt = False
         if gewaehlte_sku:
             if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
                 st.error("❌ Produkt aktuell nicht verfügbar!")
-            menge_erlaubt = False
-        else:
-            test_counts = aktuelle_counts.copy()
-            test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
-            menge_erlaubt = check_palette_valid(test_counts)
-            if not menge_erlaubt:
-                st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
+            else:
+                test_counts = aktuelle_counts.copy()
+                test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
+                menge_erlaubt = check_palette_valid(test_counts)
+                if not menge_erlaubt:
+                    st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
 
     b_col1, b_col2, b_col3 = st.columns([1, 1, 1], gap="small")
     with b_col1:
@@ -202,7 +204,7 @@ with col2:
         for p, q in st.session_state["waren_auf_palette"].items():
             df_list.append({
                 "SKU": p,
-                "Sub-Kategorie": produkt_zu_sub.get(p, ""), # 修改点：表格增加列
+                "Sub-Kategorie": produkt_zu_sub.get(p, ""),
                 "Name": produkt_zu_name.get(p, ""),
                 "Menge": f"{q} Stk.",
                 "Gesamtpreis": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"
