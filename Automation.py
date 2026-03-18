@@ -36,7 +36,7 @@ st.markdown("""
 
 # === 2. Daten laden ===
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
-EXCEL_PFAD_STOCK = "共享路径/Expert Automation.xlsx"  # 👉 未来放 SharePoint
+EXCEL_PFAD_STOCK = "https://candygroup.sharepoint.com/sites/DemandPlanningDEAT/Shared Documents/General/00 Reporting/Stock Report"
 
 @st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
@@ -50,7 +50,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             df_stock = pd.read_excel(datei_pfad_stock)
 
             # 假设包含 Product code + available Stock
-            if "available Stock" in df_stock.columns:
+            if ""Available Stock 1C12"" in df_stock.columns:
                 df_stock["Stock"] = pd.to_numeric(df_stock["available Stock"], errors="coerce")
             elif "M" in df_stock.columns:
                 df_stock["Stock"] = pd.to_numeric(df_stock["M"], errors="coerce")
