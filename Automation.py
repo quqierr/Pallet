@@ -160,7 +160,7 @@ with col1:
         
         if gewaehlte_sku:
             if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
-            st.error("❌ Produkt aktuell nicht verfügbar!")
+                st.error("❌ Produkt aktuell nicht verfügbar!")
             menge_erlaubt = False
             else:
                 test_counts = aktuelle_counts.copy()
