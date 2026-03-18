@@ -50,7 +50,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             df_stock = pd.read_excel(datei_pfad_stock)
 
             # 假设包含 Product code + available Stock
-            if ""Available Stock 1C12"" in df_stock.columns:
+            if "Available Stock 1C12" in df_stock.columns:
                 df_stock["Stock"] = pd.to_numeric(df_stock["available Stock"], errors="coerce")
             elif "M" in df_stock.columns:
                 df_stock["Stock"] = pd.to_numeric(df_stock["M"], errors="coerce")
