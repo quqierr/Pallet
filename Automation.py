@@ -35,34 +35,56 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # === 2. Daten laden ===
-EXCEL_PFAD = "Expert Automation Final v02.xlsx"
+EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
+EXCEL_PFAD_STOCK = "共享路径/Expert Automation.xlsx"  # 👉 未来放 SharePoint
 
 @st.cache_data
-def lade_daten(datei_pfad):
+def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        df = pd.read_excel(datei_pfad, sheet_name="Models")
+        # === 主数据（原Excel）===
+        df = pd.read_excel(datei_pfad_main, sheet_name="Models")
         df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
-    except Exception as e:
-        st.error(f"Excel读取失败: {e}")
-        data = {
-            "Product code": ["SKU-01", "SKU-02"],
-            "Category code": ["A", "B"],
-            "Sub-category": ["Saugroboter", "Zubehör"],
-            "Product name": ["Produkt A", "Produkt B"],
-            "Product price": [100.0, 200.0]
-        }
-        df = pd.DataFrame(data)
 
-    # 建立映射字典
+        # === 库存数据（共享路径Excel）===
+        try:
+            df_stock = pd.read_excel(datei_pfad_stock)
+
+            # 假设包含 Product code + available Stock
+            if "available Stock" in df_stock.columns:
+                df_stock["Stock"] = pd.to_numeric(df_stock["available Stock"], errors="coerce")
+            elif "M" in df_stock.columns:
+                df_stock["Stock"] = pd.to_numeric(df_stock["M"], errors="coerce")
+            else:
+                df_stock["Stock"] = 0
+
+            stock_map = dict(zip(df_stock["Product code"], df_stock["Stock"]))
+
+        except Exception as e:
+            st.warning(f"库存文件读取失败，使用默认值: {e}")
+            stock_map = {}
+
+    except Exception as e:
+        st.error(f"主Excel读取失败: {e}")
+        return {}, {}, {}, {}, {}, {}, []
+
+    # === 合并库存 ===
+    df["Stock"] = df["Product code"].map(stock_map).fillna(0)
+
+    # === 库存状态 ===
+    df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 10 else "Nicht verfügbar")
+
+    # === 映射 ===
     p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
-    p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"])) # 新增：子类别映射
+    p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"]))
     p_zu_name = dict(zip(df["Product code"], df["Product name"]))
     p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
+    p_zu_stock = dict(zip(df["Product code"], df["Stock"]))
+    p_zu_status = dict(zip(df["Product code"], df["Verfügbarkeit"]))
 
-    return p_zu_kat, p_zu_sub, p_zu_name, p_zu_preis, list(p_zu_kat.keys())
+    return p_zu_kat, p_zu_sub, p_zu_name, p_zu_preis, p_zu_stock, p_zu_status, list(p_zu_kat.keys())
 
 # 加载数据时增加子类别变量
-produkt_zu_kategorie, produkt_zu_sub, produkt_zu_name, produkt_zu_preis, ALLE_PRODUKTE = lade_daten(EXCEL_PFAD)
+produkt_zu_kategorie, produkt_zu_sub, produkt_zu_name, produkt_zu_preis, produkt_zu_stock, produkt_zu_status, ALLE_PRODUKTE = lade_daten(EXCEL_PFAD_MAIN, EXCEL_PFAD_STOCK)
 
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
@@ -129,7 +151,6 @@ with col1:
         st.success("✅ **Palette ist optimal ausgelastet!**")
         gewaehlte_sku = None
     else:
-        # 修改点：在下拉框中显示 Sub-category 让客户一眼看懂产品类型
         gewaehlte_sku = st.selectbox(
             "Produkt wählen",
             options=moegliche_produkte,
@@ -137,11 +158,14 @@ with col1:
         )
         menge = st.number_input("Menge", min_value=1, max_value=50, value=1)
         
-        menge_erlaubt = False
         if gewaehlte_sku:
-            test_counts = aktuelle_counts.copy()
-            test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
-            menge_erlaubt = check_palette_valid(test_counts)
+            if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
+            st.error("❌ Produkt aktuell nicht verfügbar!")
+            menge_erlaubt = False
+            else:
+                test_counts = aktuelle_counts.copy()
+                test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
+                menge_erlaubt = check_palette_valid(test_counts)
             if not menge_erlaubt:
                 st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
 
@@ -209,7 +233,6 @@ for e in reversed(st.session_state["verlauf"]):
         c1, c2 = st.columns(2)
         c1.write(f"**Palette #{e['id']}**")
         c2.markdown(f"<p style='text-align:right;'><b>{e['total']:,.2f} €</b></p>", unsafe_allow_html=True)
-        # 修改点：历史详情增加子类别
         h_df = [{
             "Sub-Kategorie": produkt_zu_sub.get(s), 
             "Produkt": produkt_zu_name.get(s), 
