@@ -48,20 +48,30 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
 
         # === 2. 加载库存数据 ===
         try:
-            df_stock = pd.read_excel(
-                datei_pfad_stock, 
-                sheet_name="Lagerabgleich", 
-                header=5
+            df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
+
+            # 清理列名：去掉多余空格、换行符
+            df_stock.columns = (
+                df_stock.columns
+                .astype(str)
+                .str.replace(r'\s+', ' ', regex=True)  # 多空格替换为一个空格
+                .str.replace('\n', ' ', regex=False)   # 换行替换为空格
+                .str.strip()
             )
-            df_stock.columns = df_stock.columns.astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
 
-            code_col = "Material"
-            stock_col = "Available Stock 1C12"
+            # 自动找到关键列
+            code_col_candidates = ["Material"]
+            stock_col_candidates = ["Available Stock 1C12", "Available Stock 1C12 "]
 
-            if code_col in df_stock.columns and stock_col in df_stock.columns:
+            code_col = next((c for c in code_col_candidates if c in df_stock.columns), None)
+            stock_col = next((c for c in stock_col_candidates if c in df_stock.columns), None)
+
+            if not code_col or not stock_col:
+                st.error(f"找不到关键列！库存表列名: {list(df_stock.columns)}")
+                stock_map = {}
+            else:
                 df_stock = df_stock.dropna(subset=[code_col])
-                
-                # 转换 Material 为干净的字符串（去掉 .0）
+
                 def clean_material_id(x):
                     s = str(x).strip().upper()
                     return s.split('.')[0] if '.' in s else s
@@ -70,9 +80,6 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
                 df_stock["Stock_Clean"] = pd.to_numeric(df_stock[stock_col], errors="coerce").fillna(0)
 
                 stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
-            else:
-                st.error(f"找不到列！当前识别到的列名有: {list(df_stock.columns[:10])}")
-                stock_map = {}
 
         except Exception as e:
             st.warning(f"读取库存详情失败: {e}")
@@ -80,11 +87,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
 
         # === 3. Bestände an Hauptkatalog mappen ===
         df["Stock"] = df["Product code"].map(stock_map).fillna(0)
-
-        # Verfügbarkeits-Status festlegen (Lager > 0)
-        df["Verfügbarkeit"] = df["Stock"].apply(
-            lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar"
-        )
+        df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
 
         # === 4. Mappings für die App-Logik erstellen ===
         p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
