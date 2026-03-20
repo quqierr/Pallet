@@ -42,51 +42,39 @@ EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
 @st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # === Hauptdaten (Produktkatalog) ===
+        # === 1. Hauptdaten (Produktkatalog) ===
         df = pd.read_excel(datei_pfad_main, sheet_name="Models")
         df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
+        df["Product code"] = df["Product code"].astype(str).str.strip()
 
-        # === Bestandsdaten (SAP Export) ===
+        # === 2. Bestandsdaten (SAP Export) ===
+        stock_map = {}
         try:
+            # Wir laden das Blatt "Lagerabgleich" ab Zeile 6 (header=5)
             df_stock = pd.read_excel(
                 datei_pfad_stock,
                 sheet_name="Lagerabgleich",
                 header=5
             )
             
-            df_stock.columns = df_stock.columns.str.strip()
-
-            code_col = "Material"
-            stock_col = "Available Stock 1C12"
-
-            if code_col in df_stock.columns and stock_col in df_stock.columns:
-                df_stock["Stock_Clean"] = (
-                    pd.to_numeric(df_stock[stock_col], errors="coerce")
-                    .fillna(0)
-                )
-
-                # ✅ 确保Material格式一致（非常关键）
-                df_stock[code_col] = df_stock[code_col].astype(str).str.strip()
-                df["Product code"] = df["Product code"].astype(str).str.strip()
-
-                stock_map = dict(zip(df_stock[code_col], df_stock["Stock_Clean"]))
-            else:
-                st.warning("Material oder 'Available Stock 1C12' Spalte fehlt.")
-                stock_map = {}
+            material_data = df_stock.iloc[:, 0].astype(str).str.strip()
+            bestand_data = pd.to_numeric(df_stock.iloc[:, 7], errors="coerce").fillna(0)
+            
+            stock_map = dict(zip(material_data, bestand_data))
 
         except Exception as e:
-            st.warning(f"Lagerliste konnte nicht verarbeitet werden: {e}")
+            st.warning(f"Lagerliste (Spalte A/H) konnte nicht gelesen werden: {e}")
             stock_map = {}
 
-        # === Bestände mappen ===
+        # === 3. Bestände an Hauptkatalog mappen ===
         df["Stock"] = df["Product code"].map(stock_map).fillna(0)
 
-        # ✅ 库存状态（你可以改阈值）
+        # Verfügbarkeits-Status festlegen (Lager > 0)
         df["Verfügbarkeit"] = df["Stock"].apply(
             lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar"
         )
 
-        # === Mappings ===
+        # === 4. Mappings für die App-Logik erstellen ===
         p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
         p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"]))
         p_zu_name = dict(zip(df["Product code"], df["Product name"]))
