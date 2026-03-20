@@ -35,29 +35,30 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
         # --- 1. 加载主表 (Models) ---
         df_main = pd.read_excel(datei_pfad_main, sheet_name="Models")
-        # 清理列名空格并统一大写，防止 "Product code" 找不到
-        df_main.columns = df_main.columns.str.strip() 
+        df_main.columns = df_main.columns.str.strip() # 清理表头空格
         
-        # 强制格式化 Product code 方便匹配
+        # 统一 Product code 格式
         df_main["Product code"] = df_main["Product code"].astype(str).str.strip().str.upper()
 
         # --- 2. 加载 SAP 库存表 ---
+        # 假设数据从第 6 行开始（header=5）
         df_stock_raw = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
         df_stock_raw.columns = df_stock_raw.columns.str.strip()
 
+        # 提取 Material (第1列) 和 Stock (第8列)
         df_stock_subset = df_stock_raw.iloc[:, [0, 7]].copy()
         df_stock_subset.columns = ["Material", "Stock_Value"]
         
-        # 清理库存表的 Material 格式，确保与主表对齐
+        # 清理 Material 格式
         df_stock_subset["Material_Key"] = df_stock_subset["Material"].apply(
             lambda x: str(x).strip().upper().split('.')[0]
         )
         
-        # 转换库存数字，非法格式转为 0
+        # 转换库存为数字
         df_stock_subset["Stock_Value"] = pd.to_numeric(df_stock_subset["Stock_Value"], errors="coerce").fillna(0)
 
         # --- 3. 合并数据 (Merge) ---
-        # 将库存信息合并到主表 df_main
+        # 以主表为主进行左连接
         df_final = pd.merge(
             df_main, 
             df_stock_subset[["Material_Key", "Stock_Value"]], 
@@ -66,8 +67,10 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             how="left"
         )
 
+        # 填充缺失值
         df_final["Stock_Value"] = df_final["Stock_Value"].fillna(0)
-        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 10 else "Nicht verfügbar")
+        # 状态判断逻辑
+        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
 
         # --- 4. 创建 Mappings ---
         return {
@@ -81,9 +84,23 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         }
 
     except Exception as e:
-        st.error(f"数据加载失败: {str(e)}")
+        st.error(f"❌ 数据加载失败: {str(e)}")
         return None
 
+# 初始化数据
+data = lade_daten("Expert Automation Final v02.xlsx", "Lagerliste SAP 20260320.xlsx")
+
+# 核心：防御性编程，确保 data 存在才继续定义变量
+if data is not None:
+    p_zu_kat = data["p_zu_kat"]
+    p_zu_sub = data["p_zu_sub"]
+    p_zu_name = data["p_zu_name"]
+    p_zu_preis = data["p_zu_preis"]
+    p_zu_status = data["p_zu_status"]
+    ALLE_PRODUKTE = data["alle_skus"]
+else:
+    st.warning("⚠️ 无法解析数据文件，请检查 Excel 文件路径和列名是否正确。")
+    st.stop() # 停止后续代码运行，避免 NameError
 
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
@@ -96,13 +113,9 @@ PALETTEN_REGELN = [
 
 def check_palette_valid(test_counts):
     if not test_counts: return True
-    # Entferne Kategorien mit Menge 0 für den Vergleich
     test_counts = {k: v for k, v in test_counts.items() if v > 0}
-    
     for regel in PALETTEN_REGELN:
         ist_regel_erfuellt = True
-        # Eine Regel passt nur, wenn alle Kategorien in test_counts in der Regel sind
-        # UND die Menge kleiner oder gleich der Regelvorgabe ist.
         for kat, menge in test_counts.items():
             if menge > regel.get(kat, 0):
                 ist_regel_erfuellt = False
@@ -146,7 +159,7 @@ col1, col2 = st.columns([2, 3], gap="large")
 with col1:
     st.subheader(f"Aktuelle Palette #{st.session_state['palette_nr']}")
 
-    # Filtern nach möglichen Produkten (Validierung gegen Regeln)
+    # 预过滤：只显示符合规则的产品
     moegliche_produkte = [
         p for p in ALLE_PRODUKTE
         if check_palette_valid({**aktuelle_counts, p_zu_kat[p]: aktuelle_counts[p_zu_kat[p]] + 1})
@@ -174,7 +187,6 @@ with col1:
                 if not menge_erlaubt:
                     st.error("❌ Diese Menge sprengt die Palettenregeln!")
 
-    # Buttons
     b_col1, b_col2, b_col3 = st.columns(3)
     with b_col1:
         if st.button("➕ Hinzufügen", type="primary", disabled=not (gewaehlte_sku and 'menge_erlaubt' in locals() and menge_erlaubt)):
@@ -187,6 +199,7 @@ with col1:
     with b_col3:
         if st.button("💾 Speichern", disabled=not st.session_state["waren_auf_palette"]):
             preis = sum(p_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+            # 这里的单件运费逻辑保持不变
             if sum(st.session_state["waren_auf_palette"].values()) == 1:
                 sku = list(st.session_state["waren_auf_palette"].keys())[0]
                 if p_zu_kat.get(sku) != "K1": preis += 81
@@ -241,4 +254,3 @@ if st.session_state["verlauf"]:
         <span style="font-size: 32px; font-weight: bold; color: #0C5CA8;">{gesamt_aller_paletten:,.2f} €</span>
     </div>
     """, unsafe_allow_html=True)
-
