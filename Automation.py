@@ -47,23 +47,21 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         df["Product code"] = df["Product code"].astype(str).str.strip().str.upper()
 
         # === 2. 加载库存数据 ===
-       try:
-            df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
+    try:
+        df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
 
-            # 直接取 A 列和 H 列
-            df_stock = df_stock.iloc[:, [0, 7]]  # A 列索引 0, H 列索引 7
-            df_stock.columns = ["Material", "Stock"]
+        df_stock = df_stock.iloc[:, [0, 7]]
+        df_stock.columns = ["Material", "Stock"]
 
-            # 清理 Material
-            df_stock = df_stock.dropna(subset=["Material"])
-            df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
-            df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
+        df_stock = df_stock.dropna(subset=["Material"])
+        df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
+        df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
 
-            stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
+        stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
 
-        except Exception as e:
-            st.warning(f"读取库存详情失败: {e}")
-            stock_map = {}
+    except Exception as e:
+        st.warning(f"读取库存详情失败: {e}")
+        stock_map = {}
 
         # === 3. Bestände an Hauptkatalog mappen ===
         df["Stock"] = df["Product code"].map(stock_map).fillna(0)
