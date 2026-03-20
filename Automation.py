@@ -39,31 +39,43 @@ st.markdown("""
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
 EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # === 1. Hauptdaten (Produktkatalog) ===
+        # === 1. 加载主数据 ===
         df = pd.read_excel(datei_pfad_main, sheet_name="Models")
-        df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
-        df["Product code"] = df["Product code"].astype(str).str.strip()
+        df["Product code"] = df["Product code"].astype(str).str.strip().str.upper()
 
-        # === 2. Bestandsdaten (SAP Export) ===
-        stock_map = {}
+        # === 2. 加载库存数据 ===
         try:
-            # Wir laden das Blatt "Lagerabgleich" ab Zeile 6 (header=5)
             df_stock = pd.read_excel(
-                datei_pfad_stock,
-                sheet_name="Lagerabgleich",
+                datei_pfad_stock, 
+                sheet_name="Lagerabgleich", 
                 header=5
             )
-            
-            material_data = df_stock.iloc[:, 0].astype(str).str.strip()
-            bestand_data = pd.to_numeric(df_stock.iloc[:, 7], errors="coerce").fillna(0)
-            
-            stock_map = dict(zip(material_data, bestand_data))
+            df_stock.columns = df_stock.columns.astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
+
+            code_col = "Material"
+            stock_col = "Available Stock 1C12"
+
+            if code_col in df_stock.columns and stock_col in df_stock.columns:
+                df_stock = df_stock.dropna(subset=[code_col])
+                
+                # 转换 Material 为干净的字符串（去掉 .0）
+                def clean_material_id(x):
+                    s = str(x).strip().upper()
+                    return s.split('.')[0] if '.' in s else s
+
+                df_stock["Material_Clean"] = df_stock[code_col].apply(clean_material_id)
+                df_stock["Stock_Clean"] = pd.to_numeric(df_stock[stock_col], errors="coerce").fillna(0)
+
+                stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
+            else:
+                st.error(f"找不到列！当前识别到的列名有: {list(df_stock.columns[:10])}")
+                stock_map = {}
 
         except Exception as e:
-            st.warning(f"Lagerliste (Spalte A/H) konnte nicht gelesen werden: {e}")
+            st.warning(f"读取库存详情失败: {e}")
             stock_map = {}
 
         # === 3. Bestände an Hauptkatalog mappen ===
