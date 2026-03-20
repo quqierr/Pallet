@@ -33,53 +33,57 @@ st.markdown("""
 @st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # 1. Hauptdaten laden
-        df = pd.read_excel(datei_pfad_main, sheet_name="Models")
-        df["Product code"] = df["Product code"].astype(str).str.strip().str.upper()
+        # --- 1. 加载主表 (Models) ---
+        df_main = pd.read_excel(datei_pfad_main, sheet_name="Models")
+        # 清理列名空格并统一大写，防止 "Product code" 找不到
+        df_main.columns = df_main.columns.str.strip() 
+        
+        # 强制格式化 Product code 方便匹配
+        df_main["Product code"] = df_main["Product code"].astype(str).str.strip().str.upper()
 
-        # 2. Bestandsdaten laden
-        stock_map = {}
-        try:
-            df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
-            df_stock = df_stock.iloc[:, [0, 7]]
-            df_stock.columns = ["Material", "Stock"]
-            df_stock = df_stock.dropna(subset=["Material"])
-            
-            df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
-            df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
-            stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
-        except Exception as e:
-            st.warning(f"Lagerliste konnte nicht voll geladen werden: {e}")
+        # --- 2. 加载 SAP 库存表 ---
+        df_stock_raw = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
+        df_stock_raw.columns = df_stock_raw.columns.str.strip()
 
-        # 3. Mappings erstellen
-        df["Stock"] = df["Product code"].map(stock_map).fillna(0)
-        df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
+        df_stock_subset = df_stock_raw.iloc[:, [0, 7]].copy()
+        df_stock_subset.columns = ["Material", "Stock_Value"]
+        
+        # 清理库存表的 Material 格式，确保与主表对齐
+        df_stock_subset["Material_Key"] = df_stock_subset["Material"].apply(
+            lambda x: str(x).strip().upper().split('.')[0]
+        )
+        
+        # 转换库存数字，非法格式转为 0
+        df_stock_subset["Stock_Value"] = pd.to_numeric(df_stock_subset["Stock_Value"], errors="coerce").fillna(0)
 
+        # --- 3. 合并数据 (Merge) ---
+        # 将库存信息合并到主表 df_main
+        df_final = pd.merge(
+            df_main, 
+            df_stock_subset[["Material_Key", "Stock_Value"]], 
+            left_on="Product code", 
+            right_on="Material_Key", 
+            how="left"
+        )
+
+        df_final["Stock_Value"] = df_final["Stock_Value"].fillna(0)
+        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
+
+        # --- 4. 创建 Mappings ---
         return {
-            "p_zu_kat": dict(zip(df["Product code"], df["Category code"])),
-            "p_zu_sub": dict(zip(df["Product code"], df["Sub-Categories"])),
-            "p_zu_name": dict(zip(df["Product code"], df["Product name"])),
-            "p_zu_preis": dict(zip(df["Product code"], df["Product price"])),
-            "p_zu_stock": dict(zip(df["Product code"], df["Stock"])),
-            "p_zu_status": dict(zip(df["Product code"], df["Verfügbarkeit"])),
-            "alle_skus": df["Product code"].tolist()
+            "p_zu_kat": dict(zip(df_final["Product code"], df_final["Category code"])),
+            "p_zu_sub": dict(zip(df_final["Product code"], df_final["Sub-Categories"])),
+            "p_zu_name": dict(zip(df_final["Product code"], df_final["Product name"])),
+            "p_zu_preis": dict(zip(df_final["Product code"], df_final["Product price"])),
+            "p_zu_stock": dict(zip(df_final["Product code"], df_final["Stock_Value"])),
+            "p_zu_status": dict(zip(df_final["Product code"], df_final["Verfügbarkeit"])),
+            "alle_skus": df_final["Product code"].unique().tolist()
         }
+
     except Exception as e:
-        st.error(f"Kritischer Fehler: {e}")
+        st.error(f"数据加载失败: {str(e)}")
         return None
 
-# Daten initialisieren
-data = lade_daten("Expert Automation Final v02.xlsx", "Lagerliste SAP 20260320.xlsx")
-
-if data:
-    p_zu_kat = data["p_zu_kat"]
-    p_zu_sub = data["p_zu_sub"]
-    p_zu_name = data["p_zu_name"]
-    p_zu_preis = data["p_zu_preis"]
-    p_zu_status = data["p_zu_status"]
-    ALLE_PRODUKTE = data["alle_skus"]
-else:
-    st.stop()
 
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
