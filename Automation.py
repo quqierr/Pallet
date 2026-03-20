@@ -48,7 +48,12 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
 
         # === Bestandsdaten (SAP Export) ===
         try:
-            df_stock = pd.read_excel(datei_pfad_stock, header=14)
+            df_stock = pd.read_excel(
+                datei_pfad_stock,
+                sheet_name="Lagerabgleich",
+                header=4
+            )
+            
             
             # 1. Spalte für Product Code identifizieren (jetzt "Material")
             code_col = "Material" if "Material" in df_stock.columns else "Product code"
@@ -56,10 +61,6 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             # 2. Spalte für Bestand identifizieren
             if "Available Stock 1C12" in df_stock.columns:
                 stock_col = "Available Stock 1C12"
-            elif "available Stock" in df_stock.columns:
-                stock_col = "available Stock"
-            elif "M" in df_stock.columns:
-                stock_col = "M"
             else:
                 stock_col = None
 
