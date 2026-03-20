@@ -66,7 +66,6 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         df_stock_subset["Stock_Value"] = pd.to_numeric(df_stock_subset["Stock_Value"], errors="coerce").fillna(0)
 
         # --- 3. 合并数据 (Merge) ---
-        # 以主表为主进行左连接
         df_final = pd.merge(
             df_main, 
             df_stock_subset[["Material_Key", "Stock_Value"]], 
@@ -75,9 +74,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             how="left"
         )
 
-        # 填充缺失值
         df_final["Stock_Value"] = df_final["Stock_Value"].fillna(0)
-        # 状态判断逻辑
         df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 10 else "Nicht verfügbar")
 
         # --- 4. 创建 Mappings ---
@@ -96,9 +93,8 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         return None
 
 # 初始化数据
-data = lade_daten("Expert Automation Final v02.xlsx", "Lagerliste SAP 20260320.xlsx")
+data = lade_daten(EXCEL_PFAD_MAIN, EXCEL_PFAD_STOCK)
 
-# 核心：防御性编程，确保 data 存在才继续定义变量
 if data is not None:
     p_zu_kat = data["p_zu_kat"]
     p_zu_sub = data["p_zu_sub"]
@@ -108,7 +104,8 @@ if data is not None:
     ALLE_PRODUKTE = data["alle_skus"]
 else:
     st.warning("⚠️ 无法解析数据文件，请检查 Excel 文件路径和列名是否正确。")
-    st.stop() # 停止后续代码运行，避免 NameError
+    st.stop()
+
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
     {"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24}, {"K8": 6}, {"S": 4}, {"A": 4},
@@ -164,7 +161,7 @@ st.divider()
 # === 6. Haupt-Layout ===
 aktuelle_counts = Counter()
 for p, q in st.session_state["waren_auf_palette"].items():
-    aktuelle_counts[produkt_zu_kategorie[p]] += q
+    aktuelle_counts[p_zu_kat[p]] += q  # 修改
 
 col1, col2 = st.columns([2, 3], gap="large")
 
@@ -173,7 +170,7 @@ with col1:
 
     moegliche_produkte = [
         p for p in ALLE_PRODUKTE
-        if check_palette_valid({**aktuelle_counts, produkt_zu_kategorie[p]: aktuelle_counts[produkt_zu_kategorie[p]] + 1})
+        if check_palette_valid({**aktuelle_counts, p_zu_kat[p]: aktuelle_counts[p_zu_kat[p]] + 1})  # 修改
     ]
 
     if not moegliche_produkte:
@@ -184,16 +181,16 @@ with col1:
         gewaehlte_sku = st.selectbox(
             "Produkt wählen",
             options=moegliche_produkte,
-            format_func=lambda x: f"[{produkt_zu_sub.get(x, '')}] {x} – {produkt_zu_name.get(x, '')}"
+            format_func=lambda x: f"[{p_zu_sub.get(x, '')}] {x} – {p_zu_name.get(x, '')}"
         )
         menge = st.number_input("Menge", min_value=1, max_value=50, value=1)
         menge_erlaubt = False
         if gewaehlte_sku:
-            if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
+            if p_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
                 st.error("❌ Produkt aktuell nicht verfügbar!")
             else:
                 test_counts = aktuelle_counts.copy()
-                test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
+                test_counts[p_zu_kat[gewaehlte_sku]] += menge  # 修改
                 menge_erlaubt = check_palette_valid(test_counts)
                 if not menge_erlaubt:
                     st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
@@ -209,11 +206,11 @@ with col1:
             st.rerun()
     with b_col3:
         if st.button("💾 Speichern", use_container_width=True, disabled=not st.session_state["waren_auf_palette"]):
-            preis = sum(produkt_zu_preis.get(p,0)*q for p,q in st.session_state["waren_auf_palette"].items())
+            preis = sum(p_zu_preis.get(p,0)*q for p,q in st.session_state["waren_auf_palette"].items())
             total_anzahl = sum(st.session_state["waren_auf_palette"].values())
             if total_anzahl==1:
                 sku=list(st.session_state["waren_auf_palette"].keys())[0]
-                if produkt_zu_kategorie.get(sku)!="K1":
+                if p_zu_kat.get(sku)!="K1":  # 修改
                     preis += 81
             st.session_state["verlauf"].append({
                 "id": st.session_state["palette_nr"],
@@ -231,17 +228,17 @@ with col2:
         for p,q in st.session_state["waren_auf_palette"].items():
             df_list.append({
                 "SKU": p,
-                "Sub-Kategorie": produkt_zu_sub.get(p,""),
-                "Name": produkt_zu_name.get(p,""),
+                "Sub-Kategorie": p_zu_sub.get(p,""),
+                "Name": p_zu_name.get(p,""),
                 "Menge": f"{q} Stk.",
-                "Gesamtpreis": f"{produkt_zu_preis.get(p,0)*q:,.2f} €"
+                "Gesamtpreis": f"{p_zu_preis.get(p,0)*q:,.2f} €"
             })
         st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
 
-        total_summe = sum(produkt_zu_preis.get(p,0)*q for p,q in st.session_state["waren_auf_palette"].items())
+        total_summe = sum(p_zu_preis.get(p,0)*q for p,q in st.session_state["waren_auf_palette"].items())
         if sum(st.session_state["waren_auf_palette"].values())==1:
             sku=list(st.session_state["waren_auf_palette"].keys())[0]
-            if produkt_zu_kategorie.get(sku)!="K1":
+            if p_zu_kat.get(sku)!="K1":
                 total_summe+=81
                 st.info("Versandkosten für Einzelstück-Lieferung: 81,00 €")
 
@@ -258,13 +255,13 @@ with col2:
 st.divider()
 st.subheader("Palettenübersicht")
 for e in reversed(st.session_state["verlauf"]):
-    with st.container(border=True):
+    with st.container():
         c1,c2 = st.columns(2)
         c1.write(f"**Palette #{e['id']}**")
         c2.markdown(f"<p style='text-align:right;'><b>{e['total']:,.2f} €</b></p>", unsafe_allow_html=True)
         h_df=[{
-            "Sub-Kategorie":produkt_zu_sub.get(s),
-            "Produkt":produkt_zu_name.get(s),
+            "Sub-Kategorie":p_zu_sub.get(s),
+            "Produkt":p_zu_name.get(s),
             "Menge":q
         } for s,q in e['items'].items()]
         st.dataframe(pd.DataFrame(h_df), use_container_width=True, hide_index=True)
