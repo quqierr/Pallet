@@ -36,10 +36,10 @@ st.markdown("""
 
 
 # === 2. Daten laden ===
-EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
-EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
+datei_pfad_main = "Expert Automation Final v02.xlsx"
+datei_pfad_stock = "Lagerliste SAP 20260320.xlsx"
 
-@st.cache_data(ttl=60)
+@st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
         # === 1. 加载主数据 ===
@@ -47,39 +47,19 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         df["Product code"] = df["Product code"].astype(str).str.strip().str.upper()
 
         # === 2. 加载库存数据 ===
-        try:
+       try:
             df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
 
-            # 清理列名：去掉多余空格、换行符
-            df_stock.columns = (
-                df_stock.columns
-                .astype(str)
-                .str.replace(r'\s+', ' ', regex=True)  # 多空格替换为一个空格
-                .str.replace('\n', ' ', regex=False)   # 换行替换为空格
-                .str.strip()
-            )
+            # 直接取 A 列和 H 列
+            df_stock = df_stock.iloc[:, [0, 7]]  # A 列索引 0, H 列索引 7
+            df_stock.columns = ["Material", "Stock"]
 
-            # 自动找到关键列
-            code_col_candidates = ["Material"]
-            stock_col_candidates = ["Available Stock 1C12", "Available Stock 1C12 "]
+            # 清理 Material
+            df_stock = df_stock.dropna(subset=["Material"])
+            df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
+            df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
 
-            code_col = next((c for c in code_col_candidates if c in df_stock.columns), None)
-            stock_col = next((c for c in stock_col_candidates if c in df_stock.columns), None)
-
-            if not code_col or not stock_col:
-                st.error(f"找不到关键列！库存表列名: {list(df_stock.columns)}")
-                stock_map = {}
-            else:
-                df_stock = df_stock.dropna(subset=[code_col])
-
-                def clean_material_id(x):
-                    s = str(x).strip().upper()
-                    return s.split('.')[0] if '.' in s else s
-
-                df_stock["Material_Clean"] = df_stock[code_col].apply(clean_material_id)
-                df_stock["Stock_Clean"] = pd.to_numeric(df_stock[stock_col], errors="coerce").fillna(0)
-
-                stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
+            stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
 
         except Exception as e:
             st.warning(f"读取库存详情失败: {e}")
