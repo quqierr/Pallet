@@ -51,7 +51,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
             df_stock = pd.read_excel(
                 datei_pfad_stock,
                 sheet_name="Lagerabgleich",
-                header=4
+                header=5
             )
             
             
