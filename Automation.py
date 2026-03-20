@@ -17,11 +17,6 @@ st.markdown("""
         height: 3em;
         width: 100% !important;
         transition: all 0.2s;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        padding-left: 10px;
-        padding-right: 10px;
     }
     div.stButton > button:hover {
         border-color: #000000 !important;
@@ -34,60 +29,57 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-# === 2. Daten laden ===
-datei_pfad_main = "Expert Automation Final v02.xlsx"
-datei_pfad_stock = "Lagerliste SAP 20260320.xlsx"
-
+# === 2. Daten-Logik ===
 @st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # === 1. 加载主数据 ===
+        # 1. Hauptdaten laden
         df = pd.read_excel(datei_pfad_main, sheet_name="Models")
         df["Product code"] = df["Product code"].astype(str).str.strip().str.upper()
 
-        # === 2. 加载库存数据 ===
-    try:
-        df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
-
-        df_stock = df_stock.iloc[:, [0, 7]]
-        df_stock.columns = ["Material", "Stock"]
-
-        df_stock = df_stock.dropna(subset=["Material"])
-        df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
-        df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
-
-        stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
-
-    except Exception as e:
-        st.warning(f"读取库存详情失败: {e}")
+        # 2. Bestandsdaten laden
         stock_map = {}
+        try:
+            df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
+            df_stock = df_stock.iloc[:, [0, 7]]
+            df_stock.columns = ["Material", "Stock"]
+            df_stock = df_stock.dropna(subset=["Material"])
+            
+            df_stock["Material_Clean"] = df_stock["Material"].apply(lambda x: str(x).strip().upper().split('.')[0])
+            df_stock["Stock_Clean"] = pd.to_numeric(df_stock["Stock"], errors="coerce").fillna(0)
+            stock_map = dict(zip(df_stock["Material_Clean"], df_stock["Stock_Clean"]))
+        except Exception as e:
+            st.warning(f"Lagerliste konnte nicht voll geladen werden: {e}")
 
-        # === 3. Bestände an Hauptkatalog mappen ===
+        # 3. Mappings erstellen
         df["Stock"] = df["Product code"].map(stock_map).fillna(0)
         df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
 
-        # === 4. Mappings für die App-Logik erstellen ===
-        p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
-        p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"]))
-        p_zu_name = dict(zip(df["Product code"], df["Product name"]))
-        p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
-        p_zu_stock = dict(zip(df["Product code"], df["Stock"]))
-        p_zu_status = dict(zip(df["Product code"], df["Verfügbarkeit"]))
-
-        return (
-            p_zu_kat,
-            p_zu_sub,
-            p_zu_name,
-            p_zu_preis,
-            p_zu_stock,
-            p_zu_status,
-            list(p_zu_kat.keys())
-        )
-
+        return {
+            "p_zu_kat": dict(zip(df["Product code"], df["Category code"])),
+            "p_zu_sub": dict(zip(df["Product code"], df["Sub-Categories"])),
+            "p_zu_name": dict(zip(df["Product code"], df["Product name"])),
+            "p_zu_preis": dict(zip(df["Product code"], df["Product price"])),
+            "p_zu_stock": dict(zip(df["Product code"], df["Stock"])),
+            "p_zu_status": dict(zip(df["Product code"], df["Verfügbarkeit"])),
+            "alle_skus": df["Product code"].tolist()
+        }
     except Exception as e:
-        st.error(f"Kritischer Fehler beim Laden der Hauptdaten: {e}")
-        return {}, {}, {}, {}, {}, {}, []
+        st.error(f"Kritischer Fehler: {e}")
+        return None
+
+# Daten initialisieren
+data = lade_daten("Expert Automation Final v02.xlsx", "Lagerliste SAP 20260320.xlsx")
+
+if data:
+    p_zu_kat = data["p_zu_kat"]
+    p_zu_sub = data["p_zu_sub"]
+    p_zu_name = data["p_zu_name"]
+    p_zu_preis = data["p_zu_preis"]
+    p_zu_status = data["p_zu_status"]
+    ALLE_PRODUKTE = data["alle_skus"]
+else:
+    st.stop()
 
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
@@ -100,8 +92,13 @@ PALETTEN_REGELN = [
 
 def check_palette_valid(test_counts):
     if not test_counts: return True
+    # Entferne Kategorien mit Menge 0 für den Vergleich
+    test_counts = {k: v for k, v in test_counts.items() if v > 0}
+    
     for regel in PALETTEN_REGELN:
         ist_regel_erfuellt = True
+        # Eine Regel passt nur, wenn alle Kategorien in test_counts in der Regel sind
+        # UND die Menge kleiner oder gleich der Regelvorgabe ist.
         for kat, menge in test_counts.items():
             if menge > regel.get(kat, 0):
                 ist_regel_erfuellt = False
@@ -122,15 +119,15 @@ def get_base64(bin_file):
     except: return None
 
 logo_base64 = get_base64("Logo Final.png")
-logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="270">' if logo_base64 else '<div style="font-size:24px; font-weight:bold;">[LOGO]</div>'
+logo_html = f'<img src="data:image/png;base64,{logo_base64}" width="270">' if logo_base64 else '<h1>📦</h1>'
 
 st.markdown(f"""
 <div style="display: flex; align-items: center; gap: 30px; margin-bottom: 20px;">
-<div>{logo_html}</div>
-<div>
-<h1 style="margin: 0; font-size: 40px;">Paletten-Management</h1>
-<p style="margin: 0; font-size: 18px; color: #666666;">Play with the number ones</p>
-</div>
+    <div>{logo_html}</div>
+    <div>
+        <h1 style="margin: 0; font-size: 40px;">Paletten-Management</h1>
+        <p style="margin: 0; font-size: 18px; color: #666666;">Play with the number ones</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 st.divider()
@@ -138,58 +135,57 @@ st.divider()
 # === 6. Haupt-Layout ===
 aktuelle_counts = Counter()
 for p, q in st.session_state["waren_auf_palette"].items():
-    aktuelle_counts[produkt_zu_kategorie[p]] += q
+    aktuelle_counts[p_zu_kat[p]] += q
 
 col1, col2 = st.columns([2, 3], gap="large")
 
 with col1:
     st.subheader(f"Aktuelle Palette #{st.session_state['palette_nr']}")
 
+    # Filtern nach möglichen Produkten (Validierung gegen Regeln)
     moegliche_produkte = [
         p for p in ALLE_PRODUKTE
-        if check_palette_valid({**aktuelle_counts, produkt_zu_kategorie[p]: aktuelle_counts[produkt_zu_kategorie[p]] + 1})
+        if check_palette_valid({**aktuelle_counts, p_zu_kat[p]: aktuelle_counts[p_zu_kat[p]] + 1})
     ]
 
     if not moegliche_produkte:
-        st.success("✅ **Palette ist optimal ausgelastet!**")
+        st.success("✅ **Palette ist nach Regeln optimal ausgelastet!**")
         gewaehlte_sku = None
-        menge_erlaubt = False
     else:
         gewaehlte_sku = st.selectbox(
             "Produkt wählen",
             options=moegliche_produkte,
-            format_func=lambda x: f"[{produkt_zu_sub.get(x, '')}] {x} – {produkt_zu_name.get(x, '')}"
+            format_func=lambda x: f"[{p_zu_sub.get(x, '')}] {x} – {p_zu_name.get(x, '')}"
         )
         menge = st.number_input("Menge", min_value=1, max_value=50, value=1)
         
-        # 【修正的逻辑区域：正确验证数量是否被允许】
         menge_erlaubt = False
         if gewaehlte_sku:
-            if produkt_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
+            if p_zu_status.get(gewaehlte_sku) == "Nicht verfügbar":
                 st.error("❌ Produkt aktuell nicht verfügbar!")
             else:
                 test_counts = aktuelle_counts.copy()
-                test_counts[produkt_zu_kategorie[gewaehlte_sku]] += menge
+                test_counts[p_zu_kat[gewaehlte_sku]] += menge
                 menge_erlaubt = check_palette_valid(test_counts)
                 if not menge_erlaubt:
-                    st.error("❌ Kombination nicht erlaubt oder Limit überschritten!")
+                    st.error("❌ Diese Menge sprengt die Palettenregeln!")
 
-    b_col1, b_col2, b_col3 = st.columns([1, 1, 1], gap="small")
+    # Buttons
+    b_col1, b_col2, b_col3 = st.columns(3)
     with b_col1:
-        if st.button("➕ Hinzufügen", type="primary", use_container_width=True, disabled=not (gewaehlte_sku and menge_erlaubt)):
+        if st.button("➕ Hinzufügen", type="primary", disabled=not (gewaehlte_sku and 'menge_erlaubt' in locals() and menge_erlaubt)):
             st.session_state["waren_auf_palette"][gewaehlte_sku] = st.session_state["waren_auf_palette"].get(gewaehlte_sku, 0) + menge
             st.rerun()
     with b_col2:
-        if st.button("🗑️ Leeren", use_container_width=True):
+        if st.button("🗑️ Leeren"):
             st.session_state["waren_auf_palette"] = {}
             st.rerun()
     with b_col3:
-        if st.button("💾 Speichern", use_container_width=True, disabled=not st.session_state["waren_auf_palette"]):
-            preis = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
-            total_anzahl = sum(st.session_state["waren_auf_palette"].values())
-            if total_anzahl == 1:
+        if st.button("💾 Speichern", disabled=not st.session_state["waren_auf_palette"]):
+            preis = sum(p_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+            if sum(st.session_state["waren_auf_palette"].values()) == 1:
                 sku = list(st.session_state["waren_auf_palette"].keys())[0]
-                if produkt_zu_kategorie.get(sku) != "K1": preis += 81
+                if p_zu_kat.get(sku) != "K1": preis += 81
             
             st.session_state["verlauf"].append({
                 "id": st.session_state["palette_nr"],
@@ -203,56 +199,41 @@ with col1:
 with col2:
     st.subheader("Ladungsübersicht")
     if st.session_state["waren_auf_palette"]:
-        df_list = []
+        items_data = []
         for p, q in st.session_state["waren_auf_palette"].items():
-            df_list.append({
+            items_data.append({
                 "SKU": p,
-                "Sub-Kategorie": produkt_zu_sub.get(p, ""),
-                "Name": produkt_zu_name.get(p, ""),
+                "Sub-Kategorie": p_zu_sub.get(p, ""),
+                "Name": p_zu_name.get(p, ""),
                 "Menge": f"{q} Stk.",
-                "Gesamtpreis": f"{produkt_zu_preis.get(p, 0) * q:,.2f} €"
+                "Preis": f"{p_zu_preis.get(p, 0) * q:,.2f} €"
             })
-        st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
+        st.table(pd.DataFrame(items_data))
         
-        total_summe = sum(produkt_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
+        total_summe = sum(p_zu_preis.get(p, 0) * q for p, q in st.session_state["waren_auf_palette"].items())
         if sum(st.session_state["waren_auf_palette"].values()) == 1:
             sku = list(st.session_state["waren_auf_palette"].keys())[0]
-            if produkt_zu_kategorie.get(sku) != "K1":
+            if p_zu_kat.get(sku) != "K1":
                 total_summe += 81
-                st.info("Versandkosten für Einzelstück-Lieferung: 81,00 €")
+                st.info("Hinweis: +81€ Einzelstück-Versand")
 
-        st.markdown(f"""
-        <div style="text-align: right; padding: 10px; border-top: 2px solid #EEEEEE;">
-        <span style="font-size: 16px; color: #666666;">Gesamtwert der aktuellen Palette:</span><br>
-        <span style="font-size: 24px; font-weight: bold; color: #0C5CA8;">{total_summe:,.2f} €</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<h2 style='text-align:right;'>{total_summe:,.2f} €</h2>", unsafe_allow_html=True)
     else:
         st.info("Die Palette ist leer.")
 
 # === 7. Historie ===
-st.divider()
-st.subheader("Palettenübersicht")
-for e in reversed(st.session_state["verlauf"]):
-    with st.container(border=True):
-        c1, c2 = st.columns(2)
-        c1.write(f"**Palette #{e['id']}**")
-        c2.markdown(f"<p style='text-align:right;'><b>{e['total']:,.2f} €</b></p>", unsafe_allow_html=True)
-        h_df = [{
-            "Sub-Kategorie": produkt_zu_sub.get(s), 
-            "Produkt": produkt_zu_name.get(s), 
-            "Menge": q
-        } for s, q in e['items'].items()]
-        st.dataframe(pd.DataFrame(h_df), use_container_width=True, hide_index=True)
+if st.session_state["verlauf"]:
+    st.divider()
+    st.subheader("Gespeicherte Paletten")
+    for e in reversed(st.session_state["verlauf"]):
+        with st.expander(f"Palette #{e['id']} - {e['total']:,.2f} €"):
+            h_df = [{"SKU": s, "Name": p_zu_name.get(s), "Menge": q} for s, q in e['items'].items()]
+            st.dataframe(pd.DataFrame(h_df), use_container_width=True)
 
-st.write("")
-gesamt_aller_paletten = sum(e["total"] for e in st.session_state["verlauf"])
-st.markdown(f"""
-<div style="text-align: right; padding: 20px; border-top: 3px double #EEEEEE; background-color: #F9F9F9; border-radius: 8px;">
-<span style="font-size: 18px; color: #333333;">GESAMTSUMME ALLER PALETTEN:</span><br>
-<span style="font-size: 32px; font-weight: bold; color: #0C5CA8;">{gesamt_aller_paletten:,.2f} €</span>
-</div>
-<div style="text-align: center; font-size: 13px; color: #666666; margin-top: 30px;">
-Preise Stand 16.02.2026. Alle Preise sind freibleibend und unverbindlich. Änderungen und Irrtümer vorbehalten.
-</div>
-""", unsafe_allow_html=True)
+    gesamt_aller_paletten = sum(e["total"] for e in st.session_state["verlauf"])
+    st.markdown(f"""
+    <div style="text-align: right; padding: 20px; background-color: #F9F9F9; border-radius: 8px;">
+        <span style="font-size: 18px;">GESAMTSUMME:</span><br>
+        <span style="font-size: 32px; font-weight: bold; color: #0C5CA8;">{gesamt_aller_paletten:,.2f} €</span>
+    </div>
+    """, unsafe_allow_html=True)
