@@ -34,6 +34,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
 # === 2. Daten laden ===
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
 EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
@@ -41,30 +42,58 @@ EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
 @st.cache_data(ttl=60)
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # === 主数据（原Excel）===
+        # === Hauptdaten (Produktkatalog) ===
         df = pd.read_excel(datei_pfad_main, sheet_name="Models")
         df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
 
-        # === 库存数据（共享路径Excel）===
+        # === Bestandsdaten (SAP Export) ===
         try:
             df_stock = pd.read_excel(datei_pfad_stock)
-
-            # 假设包含 Product code + available Stock
+            
+            # 1. Spalte für Product Code identifizieren (jetzt "Material")
+            code_col = "Material" if "Material" in df_stock.columns else "Product code"
+            
+            # 2. Spalte für Bestand identifizieren
             if "Available Stock 1C12" in df_stock.columns:
-                df_stock["Stock"] = pd.to_numeric(df_stock["available Stock"], errors="coerce")
+                stock_col = "Available Stock 1C12"
+            elif "available Stock" in df_stock.columns:
+                stock_col = "available Stock"
             elif "M" in df_stock.columns:
-                df_stock["Stock"] = pd.to_numeric(df_stock["M"], errors="coerce")
+                stock_col = "M"
             else:
-                df_stock["Stock"] = 0
+                stock_col = None
 
-            stock_map = dict(zip(df_stock["Product code"], df_stock["Stock"]))
+            if stock_col and code_col in df_stock.columns:
+                df_stock["Stock_Clean"] = pd.to_numeric(df_stock[stock_col], errors="coerce").fillna(0)
+                # Mapping erstellen: Material-Nummer -> Bestandsmenge
+                stock_map = dict(zip(df_stock[code_col], df_stock["Stock_Clean"]))
+            else:
+                st.warning("Spalte 'Material' oder Bestandsspalte nicht gefunden.")
+                stock_map = {}
 
         except Exception as e:
-            st.warning(f"库存文件读取失败，使用默认值: {e}")
+            st.warning(f"Lagerliste konnte nicht verarbeitet werden: {e}")
             stock_map = {}
 
+        # === Bestände an Hauptdaten mappen ===
+        # Wir nutzen die Spalte "Product code" aus der Main-Datei, um den Bestand aus der Map zu ziehen
+        df["Stock"] = df["Product code"].map(stock_map).fillna(0)
+
+        # Verfügbarkeits-Logik
+        df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
+
+        # Mappings für die App-Logik
+        p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
+        p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"]))
+        p_zu_name = dict(zip(df["Product code"], df["Product name"]))
+        p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
+        p_zu_stock = dict(zip(df["Product code"], df["Stock"]))
+        p_zu_status = dict(zip(df["Product code"], df["Verfügbarkeit"]))
+
+        return p_zu_kat, p_zu_sub, p_zu_name, p_zu_preis, p_zu_stock, p_zu_status, list(p_zu_kat.keys())
+
     except Exception as e:
-        st.error(f"主Excel读取失败: {e}")
+        st.error(f"Kritischer Fehler beim Laden der Hauptdaten: {e}")
         return {}, {}, {}, {}, {}, {}, []
 
     # === 合并库存 ===
