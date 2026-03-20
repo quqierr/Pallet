@@ -48,7 +48,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
 
         # === Bestandsdaten (SAP Export) ===
         try:
-            df_stock = pd.read_excel(datei_pfad_stock)
+            df_stock = pd.read_excel(datei_pfad_stock, header=14)
             
             # 1. Spalte für Product Code identifizieren (jetzt "Material")
             code_col = "Material" if "Material" in df_stock.columns else "Product code"
