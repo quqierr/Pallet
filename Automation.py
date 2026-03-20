@@ -38,66 +38,77 @@ div[data-testid="stBaseButton-primary"] {
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
 EXCEL_PFAD_STOCK = "Lagerliste SAP 20260320.xlsx"
 
-@st.cache_data(ttl=60)
+@st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
     try:
-        # === Hauptdaten (Produktkatalog) ===
-        df = pd.read_excel(datei_pfad_main, sheet_name="Models")
-        df["Product price"] = pd.to_numeric(df["Product price"], errors="coerce")
+        # --- 1. 加载主表 (Models) ---
+        df_main = pd.read_excel(datei_pfad_main, sheet_name="Models")
+        df_main.columns = df_main.columns.str.strip() # 清理表头空格
+        
+        # 统一 Product code 格式
+        df_main["Product code"] = df_main["Product code"].astype(str).str.strip().str.upper()
 
-        # === Bestandsdaten (SAP Export) ===
-        try:
-            # Nur Sheet "Lagerabgleich", Header in Zeile 5
-            df_stock = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=4)
+        # --- 2. 加载 SAP 库存表 ---
+        # 假设数据从第 6 行开始（header=5）
+        df_stock_raw = pd.read_excel(datei_pfad_stock, sheet_name="Lagerabgleich", header=5)
+        df_stock_raw.columns = df_stock_raw.columns.str.strip()
 
-            # Debug:列名
-            st.write("📊 SAP列名:", df_stock.columns.tolist())
+        # 提取 Material (第1列) 和 Stock (第8列)
+        df_stock_subset = df_stock_raw.iloc[:, [0, 7]].copy()
+        df_stock_subset.columns = ["Material", "Stock_Value"]
+        
+        # 清理 Material 格式
+        df_stock_subset["Material_Key"] = df_stock_subset["Material"].apply(
+            lambda x: str(x).strip().upper().split('.')[0]
+        )
+        
+        # 转换库存为数字
+        df_stock_subset["Stock_Value"] = pd.to_numeric(df_stock_subset["Stock_Value"], errors="coerce").fillna(0)
 
-            # 自动识别列
-            possible_code_cols = ["Material", "Materialnummer", "Product code", "SKU"]
-            possible_stock_cols = ["Available Stock 1C12", "available Stock", "Bestand", "Stock", "M"]
+        # --- 3. 合并数据 (Merge) ---
+        # 以主表为主进行左连接
+        df_final = pd.merge(
+            df_main, 
+            df_stock_subset[["Material_Key", "Stock_Value"]], 
+            left_on="Product code", 
+            right_on="Material_Key", 
+            how="left"
+        )
 
-            code_col = next((col for col in possible_code_cols if col in df_stock.columns), None)
-            stock_col = next((col for col in possible_stock_cols if col in df_stock.columns), None)
+        # 填充缺失值
+        df_final["Stock_Value"] = df_final["Stock_Value"].fillna(0)
+        # 状态判断逻辑
+        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
 
-            if code_col is None:
-                st.error("❌ 未找到产品编码列（Material / Product code）")
-                stock_map = {}
-            elif stock_col is None:
-                st.error("❌ 未找到库存列")
-                stock_map = {}
-            else:
-                # 去掉前导0
-                df_stock[code_col] = df_stock[code_col].astype(str).str.strip().str.lstrip("0")
-                df_stock["Stock_Clean"] = pd.to_numeric(df_stock[stock_col], errors="coerce").fillna(0)
-                stock_map = dict(zip(df_stock[code_col], df_stock["Stock_Clean"]))
-
-        except Exception as e:
-            st.warning(f"Lagerliste konnte nicht verarbeitet werden: {e}")
-            stock_map = {}
-
-        # === Bestände an Hauptdaten mappen ===
-        df["Product code"] = df["Product code"].astype(str).str.strip().str.lstrip("0")
-        df["Stock"] = df["Product code"].map(stock_map).fillna(0)
-        df["Verfügbarkeit"] = df["Stock"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
-
-        # Mappings für die App-Logik
-        p_zu_kat = dict(zip(df["Product code"], df["Category code"]))
-        p_zu_sub = dict(zip(df["Product code"], df["Sub-Categories"]))
-        p_zu_name = dict(zip(df["Product code"], df["Product name"]))
-        p_zu_preis = dict(zip(df["Product code"], df["Product price"]))
-        p_zu_stock = dict(zip(df["Product code"], df["Stock"]))
-        p_zu_status = dict(zip(df["Product code"], df["Verfügbarkeit"]))
-
-        return p_zu_kat, p_zu_sub, p_zu_name, p_zu_preis, p_zu_stock, p_zu_status, list(p_zu_kat.keys())
+        # --- 4. 创建 Mappings ---
+        return {
+            "p_zu_kat": dict(zip(df_final["Product code"], df_final["Category code"])),
+            "p_zu_sub": dict(zip(df_final["Product code"], df_final["Sub-Categories"])),
+            "p_zu_name": dict(zip(df_final["Product code"], df_final["Product name"])),
+            "p_zu_preis": dict(zip(df_final["Product code"], df_final["Product price"])),
+            "p_zu_stock": dict(zip(df_final["Product code"], df_final["Stock_Value"])),
+            "p_zu_status": dict(zip(df_final["Product code"], df_final["Verfügbarkeit"])),
+            "alle_skus": df_final["Product code"].unique().tolist()
+        }
 
     except Exception as e:
-        st.error(f"Kritischer Fehler beim Laden der Hauptdaten: {e}")
-        return {}, {}, {}, {}, {}, {}, []
+        st.error(f"❌ 数据加载失败: {str(e)}")
+        return None
 
-# 加载数据
-produkt_zu_kategorie, produkt_zu_sub, produkt_zu_name, produkt_zu_preis, produkt_zu_stock, produkt_zu_status, ALLE_PRODUKTE = lade_daten(EXCEL_PFAD_MAIN, EXCEL_PFAD_STOCK)
+# 初始化数据
+data = lade_daten("Expert Automation Final v02.xlsx", "Lagerliste SAP 20260320.xlsx")
 
+# 核心：防御性编程，确保 data 存在才继续定义变量
+if data is not None:
+    p_zu_kat = data["p_zu_kat"]
+    p_zu_sub = data["p_zu_sub"]
+    p_zu_name = data["p_zu_name"]
+    p_zu_preis = data["p_zu_preis"]
+    p_zu_status = data["p_zu_status"]
+    ALLE_PRODUKTE = data["alle_skus"]
+else:
+    st.warning("⚠️ 无法解析数据文件，请检查 Excel 文件路径和列名是否正确。")
+    st.stop() # 停止后续代码运行，避免 NameError
 # === 3. Palettenregeln ===
 PALETTEN_REGELN = [
     {"K1": 1}, {"K2": 2}, {"KB": 2}, {"B": 6}, {"K6": 24}, {"K8": 6}, {"S": 4}, {"A": 4},
