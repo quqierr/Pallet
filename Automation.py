@@ -78,7 +78,7 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
         # 填充缺失值
         df_final["Stock_Value"] = df_final["Stock_Value"].fillna(0)
         # 状态判断逻辑
-        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 0 else "Nicht verfügbar")
+        df_final["Verfügbarkeit"] = df_final["Stock_Value"].apply(lambda x: "Verfügbar" if x > 10 else "Nicht verfügbar")
 
         # --- 4. 创建 Mappings ---
         return {
