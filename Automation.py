@@ -53,6 +53,8 @@ def lade_daten(datei_pfad_main, datei_pfad_stock):
                 sheet_name="Lagerabgleich",
                 header=5
             )
+            
+            df_stock.columns = df_stock.columns.str.strip()
 
             code_col = "Material"
             stock_col = "Available Stock 1C12"
