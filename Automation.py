@@ -36,7 +36,7 @@ div[data-testid="stBaseButton-primary"] {
 
 # === 2. Daten laden ===
 EXCEL_PFAD_MAIN = "Expert Automation Final v02.xlsx"
-EXCEL_PFAD_STOCK = "Lagerliste SAP 20260706.xlsx"
+EXCEL_PFAD_STOCK = "Lagerliste SAP 20260713.xlsx"
 
 @st.cache_data
 def lade_daten(datei_pfad_main, datei_pfad_stock):
